@@ -14,27 +14,44 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pipeline
+from market_catalog import (
+    MARKETS,
+    SOURCES as MARKET_SOURCES,
+    VERIFIED_AT as MARKETS_VERIFIED_AT,
+    VOICE_BY_LOCALE,
+)
 
 
-MARKETS = {
-    "JP": {"name": "日本", "language": "日语", "locale": "ja-JP", "currency": "JPY", "voices": {"female": "ja-JP-NanamiNeural", "male": "ja-JP-KeitaNeural"}},
-    "KR": {"name": "韩国", "language": "韩语", "locale": "ko-KR", "currency": "KRW", "voices": {"female": "ko-KR-SunHiNeural", "male": "ko-KR-InJoonNeural"}},
-    "TH": {"name": "泰国", "language": "泰语", "locale": "th-TH", "currency": "THB", "voices": {"female": "th-TH-PremwadeeNeural", "male": "th-TH-NiwatNeural"}},
-    "US": {"name": "美国", "language": "英语", "locale": "en-US", "currency": "USD", "voices": {"female": "en-US-AvaNeural", "male": "en-US-AndrewNeural"}},
-    "GB": {"name": "英国", "language": "英语", "locale": "en-GB", "currency": "GBP", "voices": {"female": "en-GB-SoniaNeural", "male": "en-GB-RyanNeural"}},
-    "VN": {"name": "越南", "language": "越南语", "locale": "vi-VN", "currency": "VND", "voices": {"female": "vi-VN-HoaiMyNeural", "male": "vi-VN-NamMinhNeural"}},
-    "ID": {"name": "印度尼西亚", "language": "印尼语", "locale": "id-ID", "currency": "IDR", "voices": {"female": "id-ID-GadisNeural", "male": "id-ID-ArdiNeural"}},
-    "MY": {"name": "马来西亚", "language": None, "locale": None, "currency": "MYR"},
-    "SG": {"name": "新加坡", "language": None, "locale": None, "currency": "SGD"},
-}
 SAMPLES = {
+    "AT": "Wenn Sie dieses Produkt praktisch finden, sehen Sie sich jetzt die Details an.",
+    "BE": "Lijkt dit product handig? Bekijk dan nu de details.",
+    "BR": "Se este produto parece útil, confira os detalhes.",
+    "DE": "Wenn Sie dieses Produkt praktisch finden, sehen Sie sich jetzt die Details an.",
+    "ES": "Si este producto te parece útil, consulta ahora los detalles.",
+    "FR": "Si ce produit vous semble pratique, découvrez les détails.",
+    "GB": "If this looks useful, tap to see the details.",
+    "ID": "Kalau produk ini terasa berguna, cek detailnya sekarang.",
+    "IE": "If this looks useful, tap to see the details.",
+    "IT": "Se questo prodotto ti sembra utile, scopri ora i dettagli.",
     "JP": "この商品が気になった方は、ぜひチェックしてみてください。",
-    "KR": "이 제품이 궁금하다면 지금 확인해 보세요.",
+    "MX": "Si este producto te parece útil, revisa ahora los detalles.",
+    "MY": "Kalau produk ini nampak berguna, semak butirannya sekarang.",
+    "NL": "Lijkt dit product handig? Bekijk dan nu de details.",
+    "PH": "Kung mukhang kapaki-pakinabang ito, tingnan ang detalye ngayon.",
+    "PL": "Jeśli ten produkt wydaje się przydatny, sprawdź szczegóły.",
+    "SG": "If this looks useful, tap to see the details.",
     "TH": "หากสนใจสินค้านี้ ลองกดดูรายละเอียดได้เลยค่ะ",
     "US": "If this looks useful, tap to see the details.",
-    "GB": "If this looks useful, tap to see the details.",
     "VN": "Nếu bạn thấy sản phẩm này hữu ích, hãy xem chi tiết nhé.",
-    "ID": "Kalau produk ini terasa berguna, cek detailnya sekarang.",
+}
+LOCALE_SAMPLES = {
+    "en-PH": "If this looks useful, tap to see the details.",
+    "en-SG": "If this looks useful, tap to see the details.",
+    "fr-BE": "Si ce produit vous semble pratique, découvrez les détails.",
+    "ms-MY": "Kalau produk ini nampak berguna, semak butirannya sekarang.",
+    "nl-BE": "Lijkt dit product handig? Bekijk dan nu de details.",
+    "ta-SG": "இந்தப் பொருள் பயனுள்ளதாகத் தோன்றினால், விவரங்களைப் பாருங்கள்.",
+    "zh-CN": "如果你觉得这个商品实用，可以点开看看详情。",
 }
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".avif", ".heic"}
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
@@ -191,30 +208,57 @@ def command_doctor(_: argparse.Namespace) -> int:
 
 
 def command_markets(_: argparse.Namespace) -> int:
+    print(f"核验日期：{MARKETS_VERIFIED_AT}")
     for code, item in MARKETS.items():
-        language = item["language"] or "首次选择店铺语言"
-        locale = item["locale"] or "待选择"
-        print(f"{code:>2}  {item['name']:<8} {language:<10} {locale:<8} {item['currency']}")
+        choices = " / ".join(option["language"] for option in item["languages"])
+        print(f"{code:>2}  {item['name']:<8} {choices:<20} {item['locale']:<8} {item['currency']}")
+    print("来源：")
+    for source in MARKET_SOURCES:
+        print(f"- {source}")
     return 0
 
 
-def voice_for(code: str, preference: str) -> str | None:
+def market_profile(code: str, locale: str | None = None) -> dict:
+    item = dict(MARKETS[code])
+    selected = locale or item["locale"]
+    allowed = {choice["locale"]: choice["language"] for choice in item["languages"]}
+    if selected not in allowed:
+        raise SystemExit(
+            f"{item['name']}不支持内容语言 {selected}；可选：{', '.join(allowed)}"
+        )
+    item["locale"] = selected
+    item["language"] = allowed[selected]
+    item["voices"] = VOICE_BY_LOCALE[selected]
+    return item
+
+
+def locale_overrides(values: list[str] | None) -> dict[str, str]:
+    result = {}
+    for value in values or []:
+        if "=" not in value:
+            raise SystemExit(f"语言覆盖格式应为 MARKET=locale：{value}")
+        market, locale = value.split("=", 1)
+        code = resolve_markets([market])[0]
+        result[code] = locale
+    return result
+
+
+def voice_for(code: str, preference: str, locale: str | None = None) -> str | None:
     if preference == "none":
         return None
     gender = "male" if preference == "male" else "female"
-    return MARKETS[code].get("voices", {}).get(gender)
+    return market_profile(code, locale)["voices"].get(gender)
 
 
 def command_voice_test(args: argparse.Namespace) -> int:
     code = resolve_markets([args.market])[0]
-    if MARKETS[code]["locale"] is None:
-        raise SystemExit("多语言市场需要先选择主要内容语言。")
     binary = find_command("edge-tts")
     if not binary:
         raise SystemExit("尚未安装 Edge TTS。请先在项目根目录运行 python3 bootstrap.py。")
-    voice = voice_for(code, args.voice)
+    profile = market_profile(code, args.locale)
+    voice = voice_for(code, args.voice, args.locale)
     output = Path(args.output or f"voice-test-{code}-{args.voice}.mp3").expanduser().resolve()
-    text = args.text or SAMPLES[code]
+    text = args.text or LOCALE_SAMPLES.get(profile["locale"], SAMPLES[code])
     result = subprocess.run(
         [binary, "--voice", voice, "--text", text, "--write-media", str(output)],
         check=False,
@@ -222,7 +266,7 @@ def command_voice_test(args: argparse.Namespace) -> int:
     if result.returncode:
         return result.returncode
     print(f"试听音频：{output}")
-    print(f"市场：{MARKETS[code]['name']}；音色：{voice}")
+    print(f"市场：{profile['name']}；语言：{profile['language']}；音色：{voice}")
     return 0
 
 
@@ -239,12 +283,9 @@ def command_plan(args: argparse.Namespace) -> int:
     root = Path(args.product).expanduser().resolve()
     inventory = inspect_product(root)
     markets = resolve_markets(args.markets)
+    overrides = locale_overrides(getattr(args, "locales", None))
     if not inventory["readiness"]["can_plan_video"]:
         raise SystemExit("SP/ 中没有视频；已停止，未伪造混剪任务。")
-    ambiguous = [code for code in markets if MARKETS[code]["locale"] is None]
-    if ambiguous:
-        names = "、".join(MARKETS[code]["name"] for code in ambiguous)
-        raise SystemExit(f"{names}是多语言市场，请使用后续配置选择主要内容语言。")
     job = {
         "schema_version": 1,
         "created_at": datetime.now(timezone.utc).isoformat(),
@@ -253,18 +294,22 @@ def command_plan(args: argparse.Namespace) -> int:
         "product_id": inventory["product_id"],
         "input_counts": inventory["counts"],
         "markets": [
-            {
+            dict({
                 "code": code,
-                **MARKETS[code],
+                **market_profile(code, overrides.get(code)),
                 "video_count": args.count,
                 "tts": {
                     "provider": "none" if args.voice == "none" else "edge-tts",
                     "preference": args.voice,
-                    "voice": voice_for(code, args.voice),
+                    "voice": voice_for(code, args.voice, overrides.get(code)),
                 },
-            }
+            })
             for code in markets
         ],
+        "market_catalog": {
+            "verified_at": MARKETS_VERIFIED_AT,
+            "sources": MARKET_SOURCES,
+        },
         "required_next_artifacts": [
             "product-facts.json",
             "source-videos.json",
@@ -339,8 +384,9 @@ def parser() -> argparse.ArgumentParser:
     markets = commands.add_parser("markets", help="查看支持的市场")
     markets.set_defaults(func=command_markets)
     voice_test = commands.add_parser("voice-test", help="试听目标市场的推荐音色")
-    voice_test.add_argument("--market", required=True, help="例如 JP、韩国、TH")
+    voice_test.add_argument("--market", required=True, help="例如 JP、泰国、US")
     voice_test.add_argument("--voice", choices=["female", "male"], default="female")
+    voice_test.add_argument("--locale", help="多语言市场的内容语言，例如 en-SG")
     voice_test.add_argument("--text", help="可选的试听文案")
     voice_test.add_argument("--output", help="输出 MP3 路径")
     voice_test.set_defaults(func=command_voice_test)
@@ -353,9 +399,10 @@ def parser() -> argparse.ArgumentParser:
     preprocess.set_defaults(func=command_preprocess)
     plan = commands.add_parser("plan", help="建立多市场生产任务")
     plan.add_argument("product", help="商品目录")
-    plan.add_argument("--markets", nargs="+", required=True, help="例如 JP KR TH")
+    plan.add_argument("--markets", nargs="+", required=True, help="例如 JP TH US")
     plan.add_argument("--count", type=int, default=3, help="每个市场的视频数量")
     plan.add_argument("--voice", choices=["automatic", "female", "male", "none"], default="automatic")
+    plan.add_argument("--locale", dest="locales", action="append", help="市场语言覆盖，例如 SG=zh-CN")
     plan.set_defaults(func=command_plan)
     render = commands.add_parser("render", help="按已确认的剪辑计划生成视频")
     render.add_argument("product", help="商品目录")

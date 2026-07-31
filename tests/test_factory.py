@@ -21,9 +21,12 @@ SPEC.loader.exec_module(factory)
 
 class FactoryTests(unittest.TestCase):
     def test_market_aliases_are_unique(self):
-        self.assertEqual(factory.resolve_markets(["日本", "KR", "日本"]), ["JP", "KR"])
+        self.assertEqual(factory.resolve_markets(["日本", "TH", "日本"]), ["JP", "TH"])
         self.assertEqual(factory.voice_for("TH", "female"), "th-TH-PremwadeeNeural")
         self.assertIsNone(factory.voice_for("JP", "none"))
+        self.assertNotIn("KR", factory.MARKETS)
+        self.assertEqual(factory.market_profile("SG", "zh-CN")["language"], "中文")
+        self.assertEqual(factory.voice_for("BE", "female", "fr-BE"), "fr-BE-CharlineNeural")
 
     def test_empty_product_reports_missing_inputs(self):
         with tempfile.TemporaryDirectory() as temp:

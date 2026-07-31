@@ -171,7 +171,9 @@ def _tts(plan: dict, target: Path) -> Path | None:
         raise ValueError("通用渲染器当前只自动执行 edge-tts；其他提供商需先生成 voiceover.file")
     binary = shutil.which("edge-tts")
     if not binary:
-        sibling = Path(__import__("sys").executable).parent / "edge-tts"
+        runtime = __import__("sys")
+        suffix = ".exe" if runtime.platform == "win32" else ""
+        sibling = Path(runtime.executable).parent / f"edge-tts{suffix}"
         binary = str(sibling) if sibling.exists() else None
     if not binary:
         raise RuntimeError("找不到 edge-tts，请运行 bootstrap.py")

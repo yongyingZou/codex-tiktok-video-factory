@@ -55,6 +55,23 @@ class Handler(BaseHTTPRequestHandler):
         try:
             size = int(self.headers.get("Content-Length", "0"))
             body = json.loads(self.rfile.read(size) or b"{}")
+            if self.path == "/api/markets":
+                self.send_json({
+                    "verified_at": factory.MARKETS_VERIFIED_AT,
+                    "sources": factory.MARKET_SOURCES,
+                    "markets": [
+                        {
+                            "code": code,
+                            "name": item["name"],
+                            "language": item["language"],
+                            "locale": item["locale"],
+                            "languages": item["languages"],
+                            "currency": item["currency"],
+                        }
+                        for code, item in factory.MARKETS.items()
+                    ],
+                })
+                return
             if self.path == "/api/products":
                 products = []
                 for path in sorted(self.workspace.iterdir()):
@@ -80,6 +97,10 @@ class Handler(BaseHTTPRequestHandler):
                     "markets": markets,
                     "count": int(body.get("count", 3)),
                     "voice": body.get("voice", "automatic"),
+                    "locales": [
+                        f"{code}={locale}"
+                        for code, locale in body.get("locales", {}).items()
+                    ],
                 })
                 factory.command_plan(request)
                 self.send_json(json.loads((product / "analysis/v1/job-plan.json").read_text()))

@@ -38,14 +38,7 @@
     </section>
     <section class="card">
       <h2>3. 选择投放市场</h2>
-      <div class="markets">
-        <label class="market"><input type="checkbox" value="JP" checked>日本</label>
-        <label class="market"><input type="checkbox" value="KR">韩国</label>
-        <label class="market"><input type="checkbox" value="TH">泰国</label>
-        <label class="market"><input type="checkbox" value="US">美国</label>
-        <label class="market"><input type="checkbox" value="VN">越南</label>
-        <label class="market"><input type="checkbox" value="ID">印尼</label>
-      </div>
+      <div class="markets" id="marketList">正在读取当前市场目录…</div>
       <div class="row" style="margin-top:14px">
         <label>每个市场 <select id="count"><option>1</option><option selected>3</option><option>5</option></select> 条</label>
         <label>口播 <select id="voice"><option value="automatic">自动推荐</option><option value="female">女声</option><option value="male">男声</option><option value="none">无口播</option></select></label>
@@ -77,11 +70,26 @@
       $("products").innerHTML=d.products.map(p=>`<option value="${p.path}">${p.name}</option>`).join("");
       $("status").textContent=`已发现 ${d.products.length} 个商品`;
     }
+    async function loadMarkets(){
+      const d=await api("/api/markets",{});
+      $("marketList").innerHTML=d.markets.map(m=>{
+        const choices=m.languages.length>1
+          ? `<select class="market-language" data-code="${m.code}">${m.languages.map(x=>`<option value="${x.locale}" ${x.locale===m.locale?"selected":""}>${x.language}</option>`).join("")}</select>`
+          : `<small> · ${m.language}</small>`;
+        return `<label class="market"><input type="checkbox" value="${m.code}" ${m.code==="JP"?"checked":""}>${m.name}${choices}</label>`
+      }).join("");
+      $("status").textContent=`市场目录核验于 ${d.verified_at}`;
+    }
     async function inspectProduct(){await api("/api/inspect",{product:product()}); await loadFacts()}
     async function preprocess(){await api("/api/preprocess",{product:product()})}
     async function createPlan(){
       const markets=[...document.querySelectorAll(".market input:checked")].map(x=>x.value);
-      await api("/api/plan",{product:product(),markets,count:Number($("count").value),voice:$("voice").value})
+      const locales={};
+      document.querySelectorAll(".market input:checked").forEach(input=>{
+        const selector=document.querySelector(`.market-language[data-code="${input.value}"]`);
+        if(selector) locales[input.value]=selector.value;
+      });
+      await api("/api/plan",{product:product(),markets,locales,count:Number($("count").value),voice:$("voice").value})
     }
     async function loadFacts(){
       const d=await api("/api/facts/read",{product:product()});$("facts").value=d.content||""
@@ -90,7 +98,7 @@
       await api("/api/facts/write",{product:product(),content:$("facts").value});
       $("factStatus").textContent="已保存"
     }
-    loadProducts();
+    Promise.all([loadProducts(),loadMarkets()]);
   </script>
 </body>
 </html>

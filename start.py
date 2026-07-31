@@ -31,7 +31,11 @@ def main() -> int:
     ]
     if args.no_browser:
         command.append("--no-browser")
-    return subprocess.run(command, check=False).returncode
+    try:
+        return subprocess.run(command, check=False).returncode
+    except KeyboardInterrupt:
+        print("\n视频工厂已停止。")
+        return 0
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 {
   "name": "tiktok-video-factory",
   "interface": {
-    "displayName": "TikTok Video Factory"
+    "displayName": "TikTok Shop AI Video Factory"
   },
   "plugins": [
     {

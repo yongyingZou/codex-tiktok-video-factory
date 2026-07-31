@@ -16,7 +16,8 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
    optional `product.md` for user-confirmed facts, and generated `output/`.
 3. Run `python scripts/factory.py inspect <product-folder>` to inventory every input.
 4. Read [workflow.md](references/workflow.md) before analysis or production.
-5. Read only the selected market files under `references/markets/`.
+5. Read [markets.md](references/markets.md) and only the selected locale file under
+   `references/markets/` when present.
 6. Never render until product facts and proposed directions have been shown to the user once.
 
 ## Non-negotiable rules
