@@ -190,7 +190,7 @@ python3 factory.py qa "/path/to/商品目录" "/path/to/edit-plan.json"
 仓库是标准 Codex marketplace。发布到 GitHub 后，用户执行：
 
 ```bash
-codex plugin marketplace add owner/codex-tiktok-video-factory
+codex plugin marketplace add yongyingZou/codex-tiktok-video-factory
 codex plugin add codex-tiktok-video-factory@tiktok-video-factory
 ```
 
