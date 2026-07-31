@@ -22,7 +22,10 @@
       "end": 2.4,
       "purpose": "hook",
       "spoken_meaning": "Show the problem immediately",
-      "source_audio": "keep"
+      "source_audio": "keep",
+      "subtitle": {
+        "mode": "preserve"
+      }
     },
     {
       "source": "SP/example-02.mp4",
@@ -30,7 +33,48 @@
       "end": 5.0,
       "purpose": "solution demonstration",
       "spoken_meaning": "Show how the product solves it",
-      "source_audio": "mute"
+      "source_audio": "mute",
+      "subtitle": {
+        "mode": "replace",
+        "region": {
+          "x": 0.05,
+          "y": 0.78,
+          "width": 0.9,
+          "height": 0.11
+        },
+        "mask_intervals": [
+          {
+            "start": 0.0,
+            "end": 4.0
+          }
+        ],
+        "source_text_intervals": [
+          {
+            "start": 0.0,
+            "end": 4.0
+          }
+        ],
+        "cues": [
+          {
+            "start": 0.0,
+            "end": 2.0,
+            "text": "短い口播字幕"
+          },
+          {
+            "start": 2.0,
+            "end": 4.0,
+            "text": "原字幕の位置に表示"
+          }
+        ],
+        "style": {
+          "background": "black@0.78",
+          "font_color": "white",
+          "border_color": "black",
+          "border_width": 2,
+          "max_chars_per_line": 18,
+          "max_lines": 2
+        }
+      }
     }
   ],
   "voiceover": {

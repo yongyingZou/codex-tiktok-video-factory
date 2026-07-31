@@ -16,5 +16,7 @@ Store each market under `output/<market>/`:
 - `publish/<id>.json`: product name, description, and tags.
 - `reports/qa-report.json`: technical and editorial checks.
 
-Every edit-plan timeline item must include `source`, `start`, `end`, `purpose`, and
-`spoken_meaning`. This makes clip repetition and narrative discontinuity measurable.
+Every edit-plan timeline item must include `source`, `start`, `end`, `purpose`, `spoken_meaning`,
+and a `subtitle.mode`. A `replace` subtitle also includes normalized `region`,
+`source_text_intervals`, `mask_intervals`, synchronized `cues`, and `style`. This makes hard
+subtitle replacement deterministic and reviewable.

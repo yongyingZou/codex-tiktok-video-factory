@@ -18,7 +18,8 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
 4. Read [workflow.md](references/workflow.md) before analysis or production.
 5. Read [markets.md](references/markets.md) and only the selected locale file under
    `references/markets/` when present.
-6. Never render until product facts and proposed directions have been shown to the user once.
+6. Read [subtitles.md](references/subtitles.md) when any selected clip contains hard subtitles.
+7. Never render until product facts and proposed directions have been shown to the user once.
 
 ## Non-negotiable rules
 
@@ -29,7 +30,9 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
 - Use one clear sales logic per finished video. Multiple clips may support that logic.
 - Do not create variants by merely reordering the same shots. Track source and shot reuse.
 - Prefer source-video storytelling. Do not insert product stills merely to prove every spoken claim.
-- Preserve hard subtitles only when their meaning fits the new sequence.
+- Assign `preserve`, `replace`, or `reject` to every selected hard-subtitle clip. Prefer replacing
+  conflicting hard subtitles with synchronized narration captions in the same region; never leave
+  a visibly blurred subtitle band plus a second caption track elsewhere.
 - Create target-language copy directly; do not translate Chinese literally. Also provide a Chinese
   meaning check for the user.
 - Keep promotion, price, quantity, size, material, and performance claims consistent with confirmed

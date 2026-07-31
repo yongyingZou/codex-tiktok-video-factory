@@ -39,6 +39,35 @@ class FactoryTests(unittest.TestCase):
             self.assertEqual(result["counts"]["total"], 0)
             self.assertEqual(len(result["readiness"]["warnings"]), 2)
 
+    def test_subtitle_replacement_requires_full_mask_coverage(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP" / "clip.mp4"
+            source.parent.mkdir()
+            source.touch()
+            plan = {
+                "id": "T01",
+                "market": "JP",
+                "locale": "ja-JP",
+                "output": "output/JP/videos/T01.mp4",
+                "publish": {"product_name": "テスト"},
+                "timeline": [{
+                    "source": "SP/clip.mp4",
+                    "start": 0,
+                    "end": 3,
+                    "purpose": "hook",
+                    "subtitle": {
+                        "mode": "replace",
+                        "region": {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.1},
+                        "source_text_intervals": [{"start": 0, "end": 3}],
+                        "mask_intervals": [{"start": 0.2, "end": 3}],
+                        "cues": [{"start": 0, "end": 3, "text": "テスト"}]
+                    }
+                }]
+            }
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("完整覆盖原硬字幕时间" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

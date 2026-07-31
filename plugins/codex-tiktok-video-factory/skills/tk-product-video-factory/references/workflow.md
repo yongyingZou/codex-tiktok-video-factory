@@ -28,6 +28,9 @@ Create stable shot IDs linked to source file and timestamps. Record visual clean
 presence, hard subtitles and meaning, original speech, product visibility, usable duration,
 continuity dependencies, and allowed sales functions.
 
+For hard subtitles, record final-canvas bounding regions and appearance intervals. Choose
+`preserve`, `replace`, or `reject` before the shot enters an edit plan. See `subtitles.md`.
+
 ## 5. Directions
 
 Propose materially different sales logics based on available evidence. For each direction specify:
@@ -44,6 +47,9 @@ and tags for the selected market. Provide target-language text plus concise Chin
 Plan the timeline before rendering. Align spoken meaning with visible action. Avoid overlapping new
 voice-over with meaningful source speech unless intentionally mixed. Use licensed or clearly
 permitted music and duck it beneath voice.
+
+When replacing hard subtitles, cover the complete original text interval and place concise,
+synchronized narration captions inside the same region. Do not add a second caption track.
 
 ## 8. QA
 

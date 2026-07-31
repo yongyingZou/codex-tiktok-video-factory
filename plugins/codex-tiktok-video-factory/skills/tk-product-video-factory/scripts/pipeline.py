@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import shutil
 import subprocess
 import tempfile
@@ -120,6 +121,42 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
                 errors.append(f"片段 {index} 的结束时间必须大于开始时间")
         except (TypeError, ValueError):
             errors.append(f"片段 {index} 的时间格式错误")
+        subtitle = clip.get("subtitle", {"mode": "preserve"})
+        mode = subtitle.get("mode", "preserve")
+        if mode not in {"preserve", "replace", "reject"}:
+            errors.append(f"片段 {index} 的字幕策略无效：{mode}")
+        if mode == "reject":
+            errors.append(f"片段 {index} 已标记为 reject，不能进入渲染计划")
+        if mode == "replace":
+            region = subtitle.get("region", {})
+            if any(key not in region for key in ("x", "y", "width", "height")):
+                errors.append(f"片段 {index} 的字幕替换缺少完整 region")
+            else:
+                values = [float(region[key]) for key in ("x", "y", "width", "height")]
+                if any(value < 0 or value > 1 for value in values):
+                    errors.append(f"片段 {index} 的字幕 region 必须使用0到1的归一化坐标")
+                if values[0] + values[2] > 1 or values[1] + values[3] > 1:
+                    errors.append(f"片段 {index} 的字幕 region 超出画布")
+            if not subtitle.get("cues"):
+                errors.append(f"片段 {index} 的 replace 策略没有新字幕 cues")
+            if not subtitle.get("source_text_intervals"):
+                errors.append(f"片段 {index} 没有记录原硬字幕出现时间 source_text_intervals")
+            mask_intervals = subtitle.get("mask_intervals", [])
+            if not mask_intervals:
+                errors.append(f"片段 {index} 没有明确的 mask_intervals，可能闪出原字幕")
+            for source_interval in subtitle.get("source_text_intervals", []):
+                covered = any(
+                    float(mask.get("start", 0)) <= float(source_interval.get("start", 0))
+                    and float(mask.get("end", 0)) >= float(source_interval.get("end", 0))
+                    for mask in mask_intervals
+                )
+                if not covered:
+                    errors.append(f"片段 {index} 的遮罩没有完整覆盖原硬字幕时间")
+            for cue_index, cue in enumerate(subtitle.get("cues", []), 1):
+                if not cue.get("text", "").strip():
+                    errors.append(f"片段 {index} 字幕 {cue_index} 没有文字")
+                if float(cue.get("end", 0)) <= float(cue.get("start", 0)):
+                    errors.append(f"片段 {index} 字幕 {cue_index} 时间无效")
     publish = plan.get("publish", {})
     if len(publish.get("product_name", "")) > 30:
         errors.append("商品名称超过30个字符")
@@ -133,18 +170,107 @@ def _clip_filter(width: int, height: int) -> str:
     )
 
 
-def _render_clip(source: Path, target: Path, clip: dict, width: int, height: int) -> None:
+def _font_file(configured: str | None = None) -> str | None:
+    if configured and Path(configured).is_file():
+        return configured
+    candidates = []
+    if os.name == "nt":
+        candidates = [
+            "C:/Windows/Fonts/YuGothM.ttc",
+            "C:/Windows/Fonts/meiryo.ttc",
+            "C:/Windows/Fonts/arial.ttf",
+        ]
+    elif __import__("sys").platform == "darwin":
+        candidates = [
+            "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+            "/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc",
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+        ]
+    else:
+        candidates = [
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        ]
+    return next((path for path in candidates if Path(path).is_file()), None)
+
+
+def _filter_path(path: Path) -> str:
+    return str(path).replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+
+
+def _subtitle_filters(
+    clip: dict, width: int, height: int, temp: Path, clip_index: int
+) -> list[str]:
+    subtitle = clip.get("subtitle", {})
+    if subtitle.get("mode", "preserve") != "replace":
+        return []
+    region = subtitle["region"]
+    x = round(float(region["x"]) * width)
+    y = round(float(region["y"]) * height)
+    box_width = round(float(region["width"]) * width)
+    box_height = round(float(region["height"]) * height)
+    style = subtitle.get("style", {})
+    background = style.get("background", "black@0.78")
+    font = _font_file(style.get("font_file"))
+    font_size = int(style.get("font_size", max(34, round(height * 0.031))))
+    font_color = style.get("font_color", "white")
+    border_color = style.get("border_color", "black")
+    border_width = int(style.get("border_width", 2))
+    line_spacing = int(style.get("line_spacing", 8))
+    filters = []
+    mask_intervals = subtitle.get("mask_intervals") or [
+        {
+            "start": min(float(cue["start"]) for cue in subtitle["cues"]),
+            "end": max(float(cue["end"]) for cue in subtitle["cues"]),
+        }
+    ]
+    for interval in mask_intervals:
+        enable = f"between(t,{float(interval['start']):.3f},{float(interval['end']):.3f})"
+        filters.append(
+            f"drawbox=x={x}:y={y}:w={box_width}:h={box_height}:"
+            f"color={background}:t=fill:enable='{enable}'"
+        )
+    for cue_index, cue in enumerate(subtitle["cues"], 1):
+        text_file = temp / f"subtitle-{clip_index:03d}-{cue_index:03d}.txt"
+        text_file.write_text(cue["text"], encoding="utf-8")
+        enable = f"between(t,{float(cue['start']):.3f},{float(cue['end']):.3f})"
+        font_part = f":fontfile='{_filter_path(Path(font))}'" if font else ""
+        filters.append(
+            f"drawtext=textfile='{_filter_path(text_file)}'{font_part}:"
+            f"fontsize={font_size}:fontcolor={font_color}:"
+            f"borderw={border_width}:bordercolor={border_color}:"
+            f"line_spacing={line_spacing}:"
+            f"x={x}+({box_width}-text_w)/2:"
+            f"y={y}+({box_height}-text_h)/2:"
+            f"enable='{enable}'"
+        )
+    return filters
+
+
+def _render_clip(
+    source: Path,
+    target: Path,
+    clip: dict,
+    width: int,
+    height: int,
+    temp: Path,
+    clip_index: int,
+) -> None:
     start = float(clip["start"])
     duration = float(clip["end"]) - start
     mode = clip.get("source_audio", "mute")
     info = media_info(source)
+    video_filters = [_clip_filter(width, height)]
+    video_filters.extend(_subtitle_filters(clip, width, height, temp, clip_index))
+    vf = ",".join(video_filters)
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-ss", f"{start:.3f}", "-t", f"{duration:.3f}", "-i", str(source),
     ]
     if mode == "keep" and info["has_audio"]:
         command += [
-            "-vf", _clip_filter(width, height),
+            "-vf", vf,
             "-af", "aresample=48000,asetpts=PTS-STARTPTS",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
@@ -153,7 +279,7 @@ def _render_clip(source: Path, target: Path, clip: dict, width: int, height: int
     else:
         command += [
             "-f", "lavfi", "-t", f"{duration:.3f}", "-i", "anullsrc=r=48000:cl=stereo",
-            "-vf", _clip_filter(width, height),
+            "-vf", vf,
             "-map", "0:v:0", "-map", "1:a:0", "-shortest",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2",
@@ -198,7 +324,7 @@ def render(product: Path, plan_path: Path) -> dict:
         clips = []
         for index, clip in enumerate(plan["timeline"], 1):
             target = temp / f"clip-{index:03d}.mp4"
-            _render_clip(product / clip["source"], target, clip, width, height)
+            _render_clip(product / clip["source"], target, clip, width, height, temp, index)
             clips.append(target)
         concat_file = temp / "concat.txt"
         concat_file.write_text(
@@ -349,6 +475,28 @@ def qa(product: Path, plan_path: Path) -> dict:
             if claim.get("evidence") not in {"confirmed_user", "product_source", "repeated_source"}
         ]
         check("claims_have_usable_evidence", not invalid_claims, invalid_claims)
+        replacement_regions = []
+        unsafe_regions = []
+        long_cues = []
+        for clip_index, clip in enumerate(plan["timeline"], 1):
+            subtitle = clip.get("subtitle", {})
+            if subtitle.get("mode") != "replace":
+                continue
+            region = subtitle["region"]
+            replacement_regions.append({"clip": clip_index, **region})
+            if float(region["y"]) + float(region["height"]) > 0.9:
+                unsafe_regions.append({"clip": clip_index, **region})
+            max_chars = int(subtitle.get("style", {}).get("max_chars_per_line", 18))
+            max_lines = int(subtitle.get("style", {}).get("max_lines", 2))
+            for cue in subtitle.get("cues", []):
+                lines = cue["text"].splitlines()
+                if len(lines) > max_lines or any(len(line) > max_chars for line in lines):
+                    long_cues.append({"clip": clip_index, "text": cue["text"]})
+        check("subtitle_replacement_regions_valid", not unsafe_regions, {
+            "regions": replacement_regions,
+            "too_close_to_ui_area": unsafe_regions,
+        })
+        check("replacement_captions_fit_region", not long_cues, long_cues)
         report = {
             "status": "pass" if all(c["status"] == "pass" for c in checks) else "fail",
             "checks": checks,
@@ -358,6 +506,8 @@ def qa(product: Path, plan_path: Path) -> dict:
                 "商品事实与促销是否准确",
                 "不同成片是否拥有不同销售逻辑",
                 "封面是否与成片相关且自然",
+                "字幕遮罩是否遮挡商品、手部动作或重要演示",
+                "替换字幕是否与口播同步且没有闪出原硬字幕",
             ],
         }
     target = product / f"output/{plan.get('market', 'UNKNOWN')}/reports/{plan.get('id', 'unknown')}-qa.json"
