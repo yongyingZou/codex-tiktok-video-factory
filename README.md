@@ -1,6 +1,20 @@
 # TikTok Shop AI Video Remix Factory
 
-**Turn a folder full of product clips into distinct, localized TikTok Shop videos—not five
+## 不会剪辑，也能建立自己的TikTok Shop视频生产线
+
+**把商品图片和素材视频放进文件夹，AI从理解商品、看完素材、策划卖点，到多语言口播、
+混剪、封面、发布文案和质检，帮你走完从素材到成片的完整流程。**
+
+```text
+不需要先学Premiere或剪映
+一份素材可以策划多种销售打法
+一次准备可以制作多个国家版本
+不是把同一条视频换30次顺序
+```
+
+> 别再一条一条拖时间轴。把重复的剪辑劳动交给视频工厂，把时间留给选品、素材和销售策略。
+
+**Turn a folder full of product clips into distinct, localized TikTok Shop videos—not endless
 reorders of the same edit.**
 
 ## 找了很多素材，为什么还是做不出足够多的带货视频？
