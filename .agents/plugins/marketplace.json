@@ -1,0 +1,20 @@
+{
+  "name": "tiktok-video-factory",
+  "interface": {
+    "displayName": "TikTok Video Factory"
+  },
+  "plugins": [
+    {
+      "name": "codex-tiktok-video-factory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-tiktok-video-factory"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

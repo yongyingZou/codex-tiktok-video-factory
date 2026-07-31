@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "id": "A01",
+  "market": "JP",
+  "locale": "ja-JP",
+  "direction": "One clear customer problem and one product solution",
+  "claims": [
+    {
+      "text": "A claim used in this video",
+      "evidence": "confirmed_user",
+      "source": "product.md"
+    }
+  ],
+  "canvas": {
+    "width": 1080,
+    "height": 1920
+  },
+  "timeline": [
+    {
+      "source": "SP/example-01.mp4",
+      "start": 0.2,
+      "end": 2.4,
+      "purpose": "hook",
+      "spoken_meaning": "Show the problem immediately",
+      "source_audio": "keep"
+    },
+    {
+      "source": "SP/example-02.mp4",
+      "start": 1.0,
+      "end": 5.0,
+      "purpose": "solution demonstration",
+      "spoken_meaning": "Show how the product solves it",
+      "source_audio": "mute"
+    }
+  ],
+  "voiceover": {
+    "provider": "edge-tts",
+    "voice": "ja-JP-NanamiNeural",
+    "rate": "+8%",
+    "start": 2.2,
+    "volume": 1.0,
+    "text": "Target-market narration written directly in the target language."
+  },
+  "music": {
+    "file": "",
+    "volume": 0.12
+  },
+  "cover": {
+    "time": 1.0,
+    "output": "output/JP/covers/A01.jpg"
+  },
+  "publish": {
+    "product_name": "Product name within 30 chars",
+    "description": "Description related to this exact video ✨",
+    "tags": ["#relevant", "#product"]
+  },
+  "output": "output/JP/videos/A01.mp4"
+}

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TikTok 商品视频工厂</title>
+  <style>
+    :root{color-scheme:light;--ink:#14201c;--muted:#66746e;--line:#dfe7e3;--brand:#00a889;--soft:#effaf7;--warn:#fff5dc}
+    *{box-sizing:border-box}body{margin:0;background:#f5f7f6;color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{padding:26px max(24px,calc((100% - 1080px)/2));background:#fff;border-bottom:1px solid var(--line)}
+    h1{font-size:25px;margin:0 0 3px}.sub{color:var(--muted)}
+    main{max-width:1080px;margin:24px auto;padding:0 24px;display:grid;gap:16px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;box-shadow:0 3px 14px #12251e0a}
+    h2{font-size:17px;margin:0 0 14px}.grid{display:grid;grid-template-columns:1fr auto;gap:10px}
+    input,textarea,select{width:100%;border:1px solid #cbd6d1;border-radius:9px;padding:11px 12px;background:#fff;font:inherit}
+    textarea{min-height:145px;resize:vertical}button{border:0;border-radius:9px;padding:11px 18px;font-weight:650;cursor:pointer}
+    .primary{background:var(--brand);color:#fff}.secondary{background:var(--soft);color:#087d68}.markets{display:flex;gap:8px;flex-wrap:wrap}
+    .market{border:1px solid var(--line);border-radius:9px;padding:9px 12px}.market input{width:auto;margin-right:5px}
+    .row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.row select{width:auto}
+    pre{white-space:pre-wrap;margin:0;background:#111b18;color:#d9eee7;border-radius:10px;padding:15px;min-height:90px;max-height:300px;overflow:auto}
+    .notice{background:var(--warn);border-radius:10px;padding:11px 13px;color:#6f5417;margin-bottom:12px}
+    .status{color:var(--muted);margin-left:auto}
+    @media(max-width:650px){.grid{grid-template-columns:1fr}.status{width:100%}}
+  </style>
+</head>
+<body>
+  <header><h1>TikTok 商品视频工厂</h1><div class="sub">先理解商品和全部素材，再制作多市场版本。</div></header>
+  <main>
+    <section class="card">
+      <h2>1. 选择商品</h2>
+      <div class="grid"><input id="product" list="products" placeholder="选择商品，或粘贴商品目录"><datalist id="products"></datalist><button class="secondary" onclick="inspectProduct()">读取全部素材</button></div>
+    </section>
+    <section class="card">
+      <h2>2. 确认商品事实</h2>
+      <div class="notice">只填写你确定且希望视频使用的事实。没有的信息可以留空，系统不能自行编造。</div>
+      <textarea id="facts" placeholder="例如：&#10;商品：冰袖&#10;确定卖点：防晒、透气、速干&#10;尺码：M/L/XL&#10;折扣：50% OFF"></textarea>
+      <div class="row"><button class="secondary" onclick="saveFacts()">保存事实</button><span class="status" id="factStatus"></span></div>
+    </section>
+    <section class="card">
+      <h2>3. 选择投放市场</h2>
+      <div class="markets">
+        <label class="market"><input type="checkbox" value="JP" checked>日本</label>
+        <label class="market"><input type="checkbox" value="KR">韩国</label>
+        <label class="market"><input type="checkbox" value="TH">泰国</label>
+        <label class="market"><input type="checkbox" value="US">美国</label>
+        <label class="market"><input type="checkbox" value="VN">越南</label>
+        <label class="market"><input type="checkbox" value="ID">印尼</label>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <label>每个市场 <select id="count"><option>1</option><option selected>3</option><option>5</option></select> 条</label>
+        <label>口播 <select id="voice"><option value="automatic">自动推荐</option><option value="female">女声</option><option value="male">男声</option><option value="none">无口播</option></select></label>
+      </div>
+    </section>
+    <section class="card">
+      <h2>4. 分析与建立任务</h2>
+      <div class="row">
+        <button class="secondary" onclick="preprocess()">预处理全部视频</button>
+        <button class="primary" onclick="createPlan()">建立多市场任务</button>
+        <span class="status" id="status">等待操作</span>
+      </div>
+    </section>
+    <section class="card"><h2>运行结果</h2><pre id="result">尚未运行。</pre></section>
+  </main>
+  <script>
+    const $=id=>document.getElementById(id);
+    async function api(path,body){
+      $("status").textContent="处理中…";
+      try{
+        const res=await fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const data=await res.json(); if(!res.ok) throw new Error(data.error||"请求失败");
+        $("result").textContent=JSON.stringify(data,null,2); $("status").textContent="完成"; return data;
+      }catch(e){$("result").textContent=e.message;$("status").textContent="失败";throw e}
+    }
+    const product=()=>$("product").value.trim();
+    async function loadProducts(){
+      const d=await api("/api/products",{});
+      $("products").innerHTML=d.products.map(p=>`<option value="${p.path}">${p.name}</option>`).join("");
+      $("status").textContent=`已发现 ${d.products.length} 个商品`;
+    }
+    async function inspectProduct(){await api("/api/inspect",{product:product()}); await loadFacts()}
+    async function preprocess(){await api("/api/preprocess",{product:product()})}
+    async function createPlan(){
+      const markets=[...document.querySelectorAll(".market input:checked")].map(x=>x.value);
+      await api("/api/plan",{product:product(),markets,count:Number($("count").value),voice:$("voice").value})
+    }
+    async function loadFacts(){
+      const d=await api("/api/facts/read",{product:product()});$("facts").value=d.content||""
+    }
+    async function saveFacts(){
+      await api("/api/facts/write",{product:product(),content:$("facts").value});
+      $("factStatus").textContent="已保存"
+    }
+    loadProducts();
+  </script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TikTok 商品视频工厂"
+  short_description: "Analyze every asset and plan localized commerce videos"
+  default_prompt: "Use $tk-product-video-factory to analyze every product asset and prepare localized TikTok remix-video plans."
