@@ -366,6 +366,31 @@ def command_qa_batch(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "pass" else 2
 
 
+def command_feedback(args: argparse.Namespace) -> int:
+    root = Path(args.product).expanduser().resolve()
+    target = root / "analysis" / "v1" / "publish-feedback.json"
+    if target.is_file():
+        data = json.loads(target.read_text(encoding="utf-8"))
+    else:
+        data = {"schema_version": 1, "events": []}
+    metrics = json.loads(args.metrics) if args.metrics else {}
+    event = {
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "market": resolve_markets([args.market])[0],
+        "video_id": args.video_id,
+        "workflow_version": args.workflow_version,
+        "result": args.result,
+        "violation_type": args.violation_type,
+        "appeal_state": args.appeal_state,
+        "notes": args.notes,
+        "metrics": metrics,
+    }
+    data["events"].append(event)
+    dump(target, data)
+    print(json.dumps({"path": str(target), "event": event}, ensure_ascii=False, indent=2))
+    return 0
+
+
 def command_serve(args: argparse.Namespace) -> int:
     import webapp
     webapp.serve(
@@ -416,6 +441,21 @@ def parser() -> argparse.ArgumentParser:
     qa_batch.add_argument("product", help="商品目录")
     qa_batch.add_argument("--market", required=True)
     qa_batch.set_defaults(func=command_qa_batch)
+    feedback = commands.add_parser("feedback", help="记录发布、违规、申诉与表现结果")
+    feedback.add_argument("product", help="商品目录")
+    feedback.add_argument("--market", required=True)
+    feedback.add_argument("--video-id", required=True)
+    feedback.add_argument(
+        "--result",
+        required=True,
+        choices=["posted", "pass", "violation", "appeal_pending", "appeal_approved", "appeal_rejected"],
+    )
+    feedback.add_argument("--violation-type", default="")
+    feedback.add_argument("--appeal-state", default="not_started")
+    feedback.add_argument("--workflow-version", default="v2")
+    feedback.add_argument("--notes", default="")
+    feedback.add_argument("--metrics", help="可选JSON，例如播放、停留、点击和成交数据")
+    feedback.set_defaults(func=command_feedback)
     serve = commands.add_parser("serve", help="打开极简本地操作页面")
     serve.add_argument("--workspace", required=True, help="允许访问的商品工作区")
     serve.add_argument("--port", type=int, default=8765)

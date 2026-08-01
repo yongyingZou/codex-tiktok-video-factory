@@ -153,6 +153,7 @@ python3 start.py --workspace "/path/to/商品工作区"
 → 用户确认
 → 为各市场直接创作文案和口播
 → 为每个方向建立“钩子—需求—演示—结果/场景—行动理由”叙事映射
+→ 将全部来源拆成短动作镜头，并为每个镜头记录来源状态和画面重构方案
 → 检查素材覆盖率、镜头复用、重复结尾和仅换顺序的伪变体
 → 生成 edit-plan JSON
 → 通用渲染器输出视频、封面和发布资料
@@ -171,6 +172,16 @@ python3 start.py --workspace "/path/to/商品工作区"
 
 模板和字段见 `examples/edit-plan.example.json`。渲染前验证和成片质检都会检查发布资料是否完整。
 
+### 没有原创实拍也能使用
+
+没有自行拍摄的素材是混剪的常见前提。工厂不会因此停止工作或反复要求补拍，而是完整
+拆解现有素材，重建叙事、构图、字幕、口播、音乐和动作声音，并输出剩余风险。每个镜头
+记录 `self_shot`、`authorized`、`seller_supplied` 或 `unknown` 来源状态；未知来源不会被
+伪装成已授权，也不存在保证过审的缩放、变速或帧率参数。
+
+质检会报告独立来源数、最长连续片段、单一来源占比、原硬字幕保留率、原声保留率和已
+重构镜头占比。这些阈值是可以依据真实结果调整的内部经验，不是TikTok官方安全线。
+
 生成全部视频总览：
 
 ```bash
@@ -187,6 +198,15 @@ python3 factory.py render "/path/to/商品目录" "/path/to/edit-plan.json"
 
 ```bash
 python3 factory.py qa "/path/to/商品目录" "/path/to/edit-plan.json"
+```
+
+记录发布、违规或申诉结果，让后续工作流从真实反馈中迭代：
+
+```bash
+python3 factory.py feedback "/path/to/商品目录" \
+  --market JP --video-id B01 --result violation \
+  --violation-type unoriginal_content \
+  --notes "平台提示为非原创内容"
 ```
 
 剪辑计划格式见 `examples/edit-plan.example.json`。
