@@ -121,6 +121,34 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
                 errors.append(f"片段 {index} 的结束时间必须大于开始时间")
         except (TypeError, ValueError):
             errors.append(f"片段 {index} 的时间格式错误")
+        provenance = clip.get("provenance", {})
+        provenance_status = provenance.get("status")
+        if provenance_status not in {"self_shot", "authorized", "seller_supplied", "unknown"}:
+            errors.append(
+                f"片段 {index} 必须声明素材来源状态：self_shot、authorized、"
+                "seller_supplied 或 unknown"
+            )
+        transform = clip.get("transform", {})
+        transform_limits = {
+            "scale": (1.0, 1.2),
+            "focus_x": (0.0, 1.0),
+            "focus_y": (0.0, 1.0),
+            "brightness": (-0.2, 0.2),
+            "contrast": (0.8, 1.3),
+            "saturation": (0.0, 2.0),
+        }
+        for field, (minimum, maximum) in transform_limits.items():
+            if field not in transform:
+                continue
+            try:
+                value = float(transform[field])
+            except (TypeError, ValueError):
+                errors.append(f"片段 {index} 的 transform.{field} 不是数字")
+                continue
+            if not minimum <= value <= maximum:
+                errors.append(
+                    f"片段 {index} 的 transform.{field} 必须在 {minimum} 到 {maximum} 之间"
+                )
         subtitle = clip.get("subtitle", {"mode": "preserve"})
         mode = subtitle.get("mode", "preserve")
         if mode not in {"preserve", "replace", "reject"}:
@@ -175,11 +203,31 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
     return errors
 
 
-def _clip_filter(width: int, height: int) -> str:
-    return (
-        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},setsar=1,fps=30,format=yuv420p"
-    )
+def _clip_filter(width: int, height: int, clip: dict | None = None) -> str:
+    transform = (clip or {}).get("transform", {})
+    scale = float(transform.get("scale", 1.0))
+    focus_x = float(transform.get("focus_x", 0.5))
+    focus_y = float(transform.get("focus_y", 0.5))
+    brightness = float(transform.get("brightness", 0.0))
+    contrast = float(transform.get("contrast", 1.0))
+    saturation = float(transform.get("saturation", 1.0))
+    filters = [
+        f"scale={width}:{height}:force_original_aspect_ratio=increase",
+        f"crop={width}:{height}",
+        "setsar=1",
+        "fps=30",
+    ]
+    if scale != 1.0:
+        filters.extend([
+            f"scale=trunc(iw*{scale:.4f}/2)*2:trunc(ih*{scale:.4f}/2)*2",
+            f"crop={width}:{height}:(in_w-out_w)*{focus_x:.4f}:(in_h-out_h)*{focus_y:.4f}",
+        ])
+    if brightness != 0.0 or contrast != 1.0 or saturation != 1.0:
+        filters.append(
+            f"eq=brightness={brightness:.4f}:contrast={contrast:.4f}:saturation={saturation:.4f}"
+        )
+    filters.append("format=yuv420p")
+    return ",".join(filters)
 
 
 def _font_file(configured: str | None = None) -> str | None:
@@ -274,7 +322,7 @@ def _render_clip(
     duration = float(clip["end"]) - start
     mode = clip.get("source_audio", "mute")
     info = media_info(source)
-    video_filters = [_clip_filter(width, height)]
+    video_filters = [_clip_filter(width, height, clip)]
     video_filters.extend(_subtitle_filters(clip, width, height, temp, clip_index))
     vf = ",".join(video_filters)
     command = [
@@ -423,6 +471,59 @@ def render(product: Path, plan_path: Path) -> dict:
     return result
 
 
+def remix_depth(plan: dict) -> dict:
+    timeline = plan.get("timeline", [])
+    durations = [max(0.0, float(clip["end"]) - float(clip["start"])) for clip in timeline]
+    total = sum(durations)
+    by_source: dict[str, float] = {}
+    for clip, duration in zip(timeline, durations):
+        by_source[clip["source"]] = by_source.get(clip["source"], 0.0) + duration
+    largest_source = max(by_source.items(), key=lambda item: item[1], default=(None, 0.0))
+    transformed = sum(bool(clip.get("transform")) for clip in timeline)
+    preserved = sum(clip.get("subtitle", {}).get("mode", "preserve") == "preserve" for clip in timeline)
+    kept_audio = sum(clip.get("source_audio", "mute") == "keep" for clip in timeline)
+    provenance = [clip.get("provenance", {}).get("status", "undeclared") for clip in timeline]
+    policy = {
+        "min_unique_sources": 4,
+        "max_continuous_clip_seconds": 2.0,
+        "max_single_source_share": 0.45,
+        "max_preserved_subtitle_share": 0.4,
+        "min_transformed_shot_share": 0.6,
+        **plan.get("remix_policy", {}),
+    }
+    clip_count = len(timeline)
+    metrics = {
+        "unique_source_count": len(by_source),
+        "longest_continuous_clip_seconds": round(max(durations, default=0.0), 3),
+        "largest_source": largest_source[0],
+        "largest_single_source_share": round(largest_source[1] / total, 3) if total else 0.0,
+        "preserved_subtitle_share": round(preserved / clip_count, 3) if clip_count else 0.0,
+        "kept_source_audio_share": round(kept_audio / clip_count, 3) if clip_count else 0.0,
+        "transformed_shot_share": round(transformed / clip_count, 3) if clip_count else 0.0,
+        "provenance_counts": {status: provenance.count(status) for status in sorted(set(provenance))},
+    }
+    warnings = []
+    if metrics["unique_source_count"] < policy["min_unique_sources"]:
+        warnings.append("使用的独立来源少于内部经验目标")
+    if metrics["longest_continuous_clip_seconds"] > policy["max_continuous_clip_seconds"]:
+        warnings.append("存在超过内部经验阈值的连续源片段")
+    if metrics["largest_single_source_share"] > policy["max_single_source_share"]:
+        warnings.append("单一来源占比超过内部经验阈值")
+    if metrics["preserved_subtitle_share"] > policy["max_preserved_subtitle_share"]:
+        warnings.append("保留原硬字幕的镜头占比较高")
+    if metrics["transformed_shot_share"] < policy["min_transformed_shot_share"]:
+        warnings.append("记录了画面重构的镜头占比较低")
+    if "unknown" in provenance or "undeclared" in provenance:
+        warnings.append("存在来源或授权状态未知的素材")
+    return {
+        "status": "review" if warnings else "pass",
+        "metrics": metrics,
+        "internal_heuristics": policy,
+        "warnings": warnings,
+        "disclaimer": "内部生产启发式，不是TikTok官方阈值，也不保证审核结果。",
+    }
+
+
 def qa(product: Path, plan_path: Path) -> dict:
     plan = load(plan_path)
     output = product / plan["output"]
@@ -530,6 +631,7 @@ def qa(product: Path, plan_path: Path) -> dict:
         report = {
             "status": "pass" if all(c["status"] == "pass" for c in checks) else "fail",
             "checks": checks,
+            "remix_depth": remix_depth(plan),
             "manual_review_required": [
                 "开头是否有停止滑动的能力",
                 "镜头与口播含义是否一致",
@@ -538,6 +640,8 @@ def qa(product: Path, plan_path: Path) -> dict:
                 "封面是否与成片相关且自然",
                 "字幕遮罩是否遮挡商品、手部动作或重要演示",
                 "替换字幕是否与口播同步且没有闪出原硬字幕",
+                "画面、声音、文字与叙事是否形成实质性的新表达",
+                "内部混剪深度警告是否可以接受；不得把阈值解释成平台保证",
             ],
         }
     target = product / f"output/{plan.get('market', 'UNKNOWN')}/reports/{plan.get('id', 'unknown')}-qa.json"

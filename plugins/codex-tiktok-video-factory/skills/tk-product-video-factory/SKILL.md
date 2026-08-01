@@ -25,10 +25,16 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
 
 - Analyze every supplied image and video, including visual content, original audio, and hard
   subtitles. Report unreadable or skipped inputs explicitly.
+- Treat no-original-footage remixing as a supported production constraint. Do not repeatedly tell
+  the user to film new footage after they state that constraint. Instead, atomize all supplied
+  sources, rebuild narrative, visuals, text, and sound, and report residual originality risk.
 - Distinguish confirmed facts, strong evidence, single-source claims, reasonable inference, and
   prohibited/unverified claims.
 - Use one clear sales logic per finished video. Multiple clips may support that logic.
 - Do not create variants by merely reordering the same shots. Track source and shot reuse.
+- Record source provenance without blocking analysis: `self_shot`, `authorized`,
+  `seller_supplied`, or `unknown`. Never pretend that a transformation parameter grants rights or
+  guarantees review approval.
 - Prefer source-video storytelling. Do not insert product stills merely to prove every spoken claim.
 - Assign `preserve`, `replace`, or `reject` to every selected hard-subtitle clip. Prefer replacing
   conflicting hard subtitles with synchronized narration captions in the same region; never leave
@@ -68,6 +74,15 @@ verification was performed and keep unverified tags as relevance candidates.
 Before completion, check narrative continuity, source repetition, duplicate endings, audio overlap,
 voice cutoff, black frames, silence, dimensions, claims, promotions, market language, cover-video
 relevance, and completeness of publishing data. Report failures rather than hiding them.
+
+Also calculate remix-depth diagnostics from the edit plan: unique source count, longest continuous
+clip, largest single-source share, preserved-hard-subtitle share, kept-source-audio share,
+transformed-shot share, identical range reuse across the batch, and declared source provenance.
+Treat thresholds as configurable internal heuristics, not platform rules. Preserve sales clarity;
+do not add random frames, unrelated overlays, fixed color disturbances, or other evasive edits.
+
+After publication, record pass, violation, appeal, and performance outcomes with the workflow
+version. Use real results to revise heuristics instead of claiming a universal safe parameter.
 
 Do not promise virality or revenue. Optimize for understandable value, retention, click intent, and
 conversion while preserving factual integrity.

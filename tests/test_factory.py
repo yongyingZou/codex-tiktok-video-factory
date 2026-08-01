@@ -56,6 +56,7 @@ class FactoryTests(unittest.TestCase):
                     "start": 0,
                     "end": 3,
                     "purpose": "hook",
+                    "provenance": {"status": "unknown"},
                     "subtitle": {
                         "mode": "replace",
                         "region": {"x": 0.1, "y": 0.7, "width": 0.8, "height": 0.1},
@@ -84,6 +85,7 @@ class FactoryTests(unittest.TestCase):
                     "start": 0,
                     "end": 2,
                     "purpose": "hook",
+                    "provenance": {"status": "unknown"},
                     "subtitle": {"mode": "preserve"},
                 }],
             }
@@ -111,6 +113,46 @@ class FactoryTests(unittest.TestCase):
                 },
             }
             self.assertEqual(factory.pipeline.validate_plan(valid, root), [])
+
+    def test_remix_depth_reports_internal_risk_without_claiming_platform_guarantee(self):
+        plan = {
+            "timeline": [
+                {
+                    "source": "SP/a.mp4", "start": 0, "end": 3,
+                    "source_audio": "mute", "provenance": {"status": "unknown"},
+                    "transform": {}, "subtitle": {"mode": "preserve"},
+                },
+                {
+                    "source": "SP/b.mp4", "start": 1, "end": 2,
+                    "source_audio": "mute", "provenance": {"status": "seller_supplied"},
+                    "transform": {"scale": 1.05}, "subtitle": {"mode": "replace"},
+                },
+            ]
+        }
+        report = factory.pipeline.remix_depth(plan)
+        self.assertEqual(report["status"], "review")
+        self.assertEqual(report["metrics"]["unique_source_count"], 2)
+        self.assertIn("不是TikTok官方阈值", report["disclaimer"])
+
+    def test_feedback_command_records_violation_event(self):
+        with tempfile.TemporaryDirectory() as temp:
+            args = type("Args", (), {
+                "product": temp,
+                "market": "JP",
+                "video_id": "B01",
+                "workflow_version": "v1",
+                "result": "violation",
+                "violation_type": "unoriginal_content",
+                "appeal_state": "not_started",
+                "notes": "First confirmed production feedback",
+                "metrics": "{\"views\": 0}",
+            })()
+            self.assertEqual(factory.command_feedback(args), 0)
+            payload = __import__("json").loads(
+                (Path(temp) / "analysis/v1/publish-feedback.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(payload["events"][0]["video_id"], "B01")
+            self.assertEqual(payload["events"][0]["result"], "violation")
 
 
 if __name__ == "__main__":
