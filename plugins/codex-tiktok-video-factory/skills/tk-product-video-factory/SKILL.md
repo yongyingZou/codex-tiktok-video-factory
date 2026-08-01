@@ -56,8 +56,12 @@ Use the schemas described in [artifacts.md](references/artifacts.md). Each marke
 `videos/`, `covers/`, `publish/`, `reports/`, and `edit-plans/`.
 
 For publishing data, keep the product name within 30 characters and free of emoji. Make the
-description specific to the video; colorful emoji are allowed. Use only relevant tags and label
-unverified trending tags as candidates.
+product name stable and search-oriented instead of turning each video's angle into a different
+product identity. Write a video-specific description with a hook or pain point, the visible product
+change, and a natural reason to open the product link; colorful emoji are allowed. Use five to
+seven relevant tags split between stable product/category terms and terms specific to this video's
+problem, scene, or feature. Never label guessed tags as trending. Record whether real-time trend
+verification was performed and keep unverified tags as relevance candidates.
 
 ## Quality gate
 
