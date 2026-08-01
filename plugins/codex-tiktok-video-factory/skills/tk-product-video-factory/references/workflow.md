@@ -31,6 +31,11 @@ continuity dependencies, and allowed sales functions.
 For hard subtitles, record final-canvas bounding regions and appearance intervals. Choose
 `preserve`, `replace`, or `reject` before the shot enters an edit plan. See `subtitles.md`.
 
+When the user has no self-shot footage, treat that as a constraint rather than a blocker. Split
+sources into short semantic actions instead of preserving complete source arguments. Record source
+provenance separately from creative usefulness. Unknown provenance increases risk but does not
+justify inventing a guaranteed transformation threshold.
+
 ## 5. Directions
 
 Propose materially different sales logics based on available evidence. For each direction specify:
@@ -72,6 +77,12 @@ supports. Prefer action-to-result, problem-to-solution, feature-to-scene, or que
 transitions. Reject decorative shots that interrupt the argument. Do not impose a fixed duration;
 end when the sales idea is complete and remove repeated conclusions.
 
+For each selected shot, define a purposeful transform only when it improves the new presentation:
+reframe/zoom around the product or action, modest timing adjustment, unified color correction,
+subtitle replacement, source-audio handling, and synchronized informational overlays or action
+sounds. Do not apply the same transform to every shot. Do not alter file hashes, filenames, frame
+rates, random frames, or unrelated layers as an originality strategy.
+
 When replacing hard subtitles, cover the complete original text interval and place concise,
 synchronized narration captions inside the same region. Do not add a second caption track.
 
@@ -84,3 +95,8 @@ Review publishing data as part of editorial QA. Keep one stable, searchable prod
 the batch; put the per-video angle in the description. Require five to seven relevant tags, including
 stable product/category tags and video-specific tags. Record real-time trend verification separately
 so relevance guesses are never presented as current hot tags.
+
+Record publication outcomes in `analysis/v1/publish-feedback.json`. Include market, video ID,
+workflow version, result, violation type, appeal state, notes, and optional performance metrics.
+When a video is rejected, pause sibling outputs that share its source/editing pattern until the
+failure has been reviewed.

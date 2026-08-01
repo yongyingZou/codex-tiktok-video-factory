@@ -7,6 +7,7 @@ Store analysis in `analysis/v1/`:
 - `source-videos.json`: full-video summaries and original tactics.
 - `shot-library.json`: timestamped reusable shots with sales functions.
 - `video-directions.json`: distinct narratives and required shots.
+- `publish-feedback.json`: publication outcomes and violations used to improve later heuristics.
 
 Store each market under `output/<market>/`:
 
@@ -18,9 +19,14 @@ Store each market under `output/<market>/`:
 - `reports/qa-report.json`: technical and editorial checks.
 
 Every edit-plan timeline item must include `source`, `start`, `end`, `purpose`, `spoken_meaning`,
-and a `subtitle.mode`. A `replace` subtitle also includes normalized `region`,
+`provenance.status`, `transform`, and a `subtitle.mode`. Provenance status is one of `self_shot`,
+`authorized`, `seller_supplied`, or `unknown`. A `replace` subtitle also includes normalized `region`,
 `source_text_intervals`, `mask_intervals`, synchronized `cues`, and `style`. This makes hard
 subtitle replacement deterministic and reviewable.
+
+Supported deterministic transform fields are `scale` (1.0–1.2), normalized `focus_x` and
+`focus_y` (0–1), `brightness` (-0.2–0.2), `contrast` (0.8–1.3), and `saturation` (0–2). Use them
+per shot for composition and visual consistency, never as fixed anti-detection parameters.
 
 Recommended publishing shape:
 

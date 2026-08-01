@@ -23,6 +23,18 @@
       "purpose": "hook",
       "spoken_meaning": "Show the problem immediately",
       "source_audio": "keep",
+      "provenance": {
+        "status": "unknown",
+        "evidence": "No source authorization record supplied"
+      },
+      "transform": {
+        "scale": 1.05,
+        "focus_x": 0.5,
+        "focus_y": 0.45,
+        "brightness": 0.02,
+        "contrast": 1.04,
+        "saturation": 1.02
+      },
       "subtitle": {
         "mode": "preserve"
       }
@@ -34,6 +46,18 @@
       "purpose": "solution demonstration",
       "spoken_meaning": "Show how the product solves it",
       "source_audio": "mute",
+      "provenance": {
+        "status": "seller_supplied",
+        "evidence": "Supplier asset folder; authorization still needs confirmation"
+      },
+      "transform": {
+        "scale": 1.08,
+        "focus_x": 0.55,
+        "focus_y": 0.5,
+        "brightness": 0.0,
+        "contrast": 1.05,
+        "saturation": 1.0
+      },
       "subtitle": {
         "mode": "replace",
         "region": {
