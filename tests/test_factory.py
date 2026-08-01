@@ -68,6 +68,50 @@ class FactoryTests(unittest.TestCase):
             errors = factory.pipeline.validate_plan(plan, root)
             self.assertTrue(any("完整覆盖原硬字幕时间" in error for error in errors))
 
+    def test_publish_metadata_requires_complete_search_structure(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP" / "clip.mp4"
+            source.parent.mkdir()
+            source.touch()
+            base = {
+                "id": "T02",
+                "market": "JP",
+                "locale": "ja-JP",
+                "output": "output/JP/videos/T02.mp4",
+                "timeline": [{
+                    "source": "SP/clip.mp4",
+                    "start": 0,
+                    "end": 2,
+                    "purpose": "hook",
+                    "subtitle": {"mode": "preserve"},
+                }],
+            }
+            invalid = dict(base)
+            invalid["publish"] = {
+                "product_name": "テスト商品",
+                "description": "",
+                "tags": ["#商品", "#便利"],
+            }
+            errors = factory.pipeline.validate_plan(invalid, root)
+            self.assertTrue(any("描述" in error for error in errors))
+            self.assertTrue(any("5到7个" in error for error in errors))
+            self.assertTrue(any("实时热门验证" in error for error in errors))
+
+            valid = dict(base)
+            valid["publish"] = {
+                "product_name": "テスト商品",
+                "description": "悩みから商品の変化まで伝える説明です✨",
+                "description_cn": "中文核对",
+                "tags": ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"],
+                "hashtag_strategy": {
+                    "core_product": ["#商品", "#カテゴリ"],
+                    "video_specific": ["#特徴", "#場面", "#悩み"],
+                    "realtime_hot_verified": False,
+                },
+            }
+            self.assertEqual(factory.pipeline.validate_plan(valid, root), [])
+
 
 if __name__ == "__main__":
     unittest.main()

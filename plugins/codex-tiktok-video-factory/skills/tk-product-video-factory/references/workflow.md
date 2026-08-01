@@ -37,6 +37,25 @@ Propose materially different sales logics based on available evidence. For each 
 audience/problem, hook, promise, supporting shots, objection addressed, CTA, missing assets, and why
 it differs from other directions.
 
+Before editing, build a narrative evidence map for every direction:
+
+- `hook`: the first visual or source speech that creates attention;
+- `problem_or_need`: the viewer situation the video is about;
+- `mechanism_or_demo`: what the product visibly does;
+- `result_or_scene`: the change, outcome, or believable use scene;
+- `cta`: the reason to inspect the linked product.
+
+Not every video needs all five as separate shots, but the finished sequence must communicate a
+complete buying idea. A spoken claim can be supported by a strongly associated scene; do not force
+an unrelated product still or laboratory-style proof into the timeline merely because narration
+mentions the feature. If the needed visual relationship is absent or ambiguous, narrow the copy or
+report missing footage.
+
+Across a batch, measure source-file coverage and shot reuse before rendering. Reusing a strong shot
+is allowed when it serves a genuinely different meaning, but changing only shot order, narration
+wording, or the opening clip does not create a new sales direction. Give each video a different
+viewer problem, purchase reason, supporting-shot combination, and ending where the assets allow it.
+
 ## 6. Localization
 
 Keep product facts shared. Recreate hook, syntax, rhythm, politeness, CTA, cover copy, description,
@@ -48,6 +67,11 @@ Plan the timeline before rendering. Align spoken meaning with visible action. Av
 voice-over with meaningful source speech unless intentionally mixed. Use licensed or clearly
 permitted music and duck it beneath voice.
 
+Record each shot's narrative role, why it follows the previous shot, and what spoken line it
+supports. Prefer action-to-result, problem-to-solution, feature-to-scene, or question-to-answer
+transitions. Reject decorative shots that interrupt the argument. Do not impose a fixed duration;
+end when the sales idea is complete and remove repeated conclusions.
+
 When replacing hard subtitles, cover the complete original text interval and place concise,
 synchronized narration captions inside the same region. Do not add a second caption track.
 
@@ -55,3 +79,8 @@ synchronized narration captions inside the same region. Do not add a second capt
 
 Run technical and editorial checks. Compare every output against its direction instead of checking
 only file validity. Record failures, warnings, source-usage ratios, and claims used.
+
+Review publishing data as part of editorial QA. Keep one stable, searchable product identity across
+the batch; put the per-video angle in the description. Require five to seven relevant tags, including
+stable product/category tags and video-specific tags. Record real-time trend verification separately
+so relevance guesses are never presented as current hot tags.

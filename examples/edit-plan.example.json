@@ -94,9 +94,16 @@
     "output": "output/JP/covers/A01.jpg"
   },
   "publish": {
-    "product_name": "Product name within 30 chars",
-    "description": "Description related to this exact video ✨",
-    "tags": ["#relevant", "#product"]
+    "product_name": "Stable product name within 30 chars",
+    "description": "Pain or hook, visible product value, and a natural product-link CTA ✨",
+    "description_cn": "Concise Chinese meaning check for the user",
+    "tags": ["#core_product", "#category", "#feature", "#scene", "#problem"],
+    "hashtag_strategy": {
+      "core_product": ["#core_product", "#category"],
+      "video_specific": ["#feature", "#scene", "#problem"],
+      "realtime_hot_verified": false,
+      "note": "Relevant candidates; verify real-time trends on publication day."
+    }
   },
   "output": "output/JP/videos/A01.mp4"
 }

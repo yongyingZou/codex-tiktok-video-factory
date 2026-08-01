@@ -160,6 +160,18 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
     publish = plan.get("publish", {})
     if len(publish.get("product_name", "")) > 30:
         errors.append("商品名称超过30个字符")
+    if not publish.get("product_name", "").strip():
+        errors.append("发布资料缺少商品名称")
+    if not publish.get("description", "").strip():
+        errors.append("发布资料缺少与本条视频对应的描述")
+    tags = publish.get("tags", [])
+    if not isinstance(tags, list) or not 5 <= len(tags) <= 7:
+        errors.append("发布资料需要5到7个相关话题标签")
+    elif any(not isinstance(tag, str) or not tag.startswith("#") or len(tag) < 2 for tag in tags):
+        errors.append("每个话题标签必须是以#开头的非空字符串")
+    strategy = publish.get("hashtag_strategy", {})
+    if not isinstance(strategy.get("realtime_hot_verified"), bool):
+        errors.append("发布资料必须声明话题标签是否经过实时热门验证")
     return errors
 
 
@@ -238,6 +250,7 @@ def _subtitle_filters(
         font_part = f":fontfile='{_filter_path(Path(font))}'" if font else ""
         filters.append(
             f"drawtext=textfile='{_filter_path(text_file)}'{font_part}:"
+            "expansion=none:"
             f"fontsize={font_size}:fontcolor={font_color}:"
             f"borderw={border_width}:bordercolor={border_color}:"
             f"line_spacing={line_spacing}:"
@@ -467,6 +480,23 @@ def qa(product: Path, plan_path: Path) -> dict:
             if unicodedata.category(char) in {"So", "Sk"}
         ]
         check("product_name_has_no_emoji", not symbol_chars, symbol_chars)
+        description = publish.get("description", "")
+        check("publish_description_present", bool(description.strip()), description)
+        tags = publish.get("tags", [])
+        check("publish_tag_count", isinstance(tags, list) and 5 <= len(tags) <= 7, tags)
+        check(
+            "publish_tag_format",
+            isinstance(tags, list) and all(
+                isinstance(tag, str) and tag.startswith("#") and len(tag) > 1 for tag in tags
+            ),
+            tags,
+        )
+        strategy = publish.get("hashtag_strategy", {})
+        check(
+            "hashtag_trend_status_declared",
+            isinstance(strategy.get("realtime_hot_verified"), bool),
+            strategy,
+        )
         expected_locale = plan.get("locale")
         check("market_locale_set", bool(expected_locale), expected_locale)
         claims = plan.get("claims", [])
