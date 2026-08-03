@@ -25,6 +25,10 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
 
 - Analyze every supplied image and video, including visual content, original audio, and hard
   subtitles. Report unreadable or skipped inputs explicitly.
+- Prefer product, hand, body-detail, back-view, and use-scene shots over identifiable real faces.
+  Allow clearly AI-generated faces when useful. When face origin is uncertain, treat it as real.
+  Do not use drifting stickers, large blocks, or other conspicuous face covers; reframe or reject
+  the shot when a real face has no necessary sales function.
 - Treat no-original-footage remixing as a supported production constraint. Do not repeatedly tell
   the user to film new footage after they state that constraint. Instead, atomize all supplied
   sources, rebuild narrative, visuals, text, and sound, and report residual originality risk.
@@ -36,9 +40,10 @@ sales logic as the core work; treat OCR, scene detection, TTS, and FFmpeg as sup
   `seller_supplied`, or `unknown`. Never pretend that a transformation parameter grants rights or
   guarantees review approval.
 - Prefer source-video storytelling. Do not insert product stills merely to prove every spoken claim.
-- Assign `preserve`, `replace`, or `reject` to every selected hard-subtitle clip. Prefer replacing
-  conflicting hard subtitles with synchronized narration captions in the same region; never leave
-  a visibly blurred subtitle band plus a second caption track elsewhere.
+- Assign `preserve`, `crop`, `replace`, or `reject` to every selected hard-subtitle clip. Prefer a
+  clean shot, then a purposeful crop, then semantically compatible source text, and only then a
+  small localized replacement. Reject shots that require a large mask. Never leave a visibly
+  blurred subtitle band, a conspicuous cover block, or a second caption track elsewhere.
 - Create target-language copy directly; do not translate Chinese literally. Also provide a Chinese
   meaning check for the user.
 - Keep promotion, price, quantity, size, material, and performance claims consistent with confirmed
@@ -73,7 +78,9 @@ verification was performed and keep unverified tags as relevance candidates.
 
 Before completion, check narrative continuity, source repetition, duplicate endings, audio overlap,
 voice cutoff, black frames, silence, dimensions, claims, promotions, market language, cover-video
-relevance, and completeness of publishing data. Report failures rather than hiding them.
+relevance, publishing-data completeness, unnecessary identifiable real faces, subtitle leakage,
+mask area, and crop damage to products or hands. Report failures rather than hiding them. A
+technical QA pass is not an editorial or visual pass.
 
 Also calculate remix-depth diagnostics from the edit plan: unique source count, longest continuous
 clip, largest single-source share, preserved-hard-subtitle share, kept-source-audio share,

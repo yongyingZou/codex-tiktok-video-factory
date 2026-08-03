@@ -130,7 +130,7 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
             )
         transform = clip.get("transform", {})
         transform_limits = {
-            "scale": (1.0, 1.2),
+            "scale": (1.0, 1.5),
             "focus_x": (0.0, 1.0),
             "focus_y": (0.0, 1.0),
             "brightness": (-0.2, 0.2),
@@ -151,7 +151,7 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
                 )
         subtitle = clip.get("subtitle", {"mode": "preserve"})
         mode = subtitle.get("mode", "preserve")
-        if mode not in {"preserve", "replace", "reject"}:
+        if mode not in {"preserve", "crop", "replace", "reject"}:
             errors.append(f"片段 {index} 的字幕策略无效：{mode}")
         if mode == "reject":
             errors.append(f"片段 {index} 已标记为 reject，不能进入渲染计划")
@@ -608,6 +608,7 @@ def qa(product: Path, plan_path: Path) -> dict:
         check("claims_have_usable_evidence", not invalid_claims, invalid_claims)
         replacement_regions = []
         unsafe_regions = []
+        oversized_regions = []
         long_cues = []
         for clip_index, clip in enumerate(plan["timeline"], 1):
             subtitle = clip.get("subtitle", {})
@@ -617,6 +618,8 @@ def qa(product: Path, plan_path: Path) -> dict:
             replacement_regions.append({"clip": clip_index, **region})
             if float(region["y"]) + float(region["height"]) > 0.9:
                 unsafe_regions.append({"clip": clip_index, **region})
+            if float(region["width"]) * float(region["height"]) > 0.18:
+                oversized_regions.append({"clip": clip_index, **region})
             max_chars = int(subtitle.get("style", {}).get("max_chars_per_line", 18))
             max_lines = int(subtitle.get("style", {}).get("max_lines", 2))
             for cue in subtitle.get("cues", []):
@@ -627,6 +630,7 @@ def qa(product: Path, plan_path: Path) -> dict:
             "regions": replacement_regions,
             "too_close_to_ui_area": unsafe_regions,
         })
+        check("subtitle_replacement_not_oversized", not oversized_regions, oversized_regions)
         check("replacement_captions_fit_region", not long_cues, long_cues)
         report = {
             "status": "pass" if all(c["status"] == "pass" for c in checks) else "fail",
@@ -638,7 +642,10 @@ def qa(product: Path, plan_path: Path) -> dict:
                 "商品事实与促销是否准确",
                 "不同成片是否拥有不同销售逻辑",
                 "封面是否与成片相关且自然",
+                "真人正脸是否确有必要；不确定是否AI时是否按真人处理",
                 "字幕遮罩是否遮挡商品、手部动作或重要演示",
+                "字幕替换区域是否过大、残留字形或形成明显补丁",
+                "裁切是否损伤商品主体、手部动作或使用效果",
                 "替换字幕是否与口播同步且没有闪出原硬字幕",
                 "画面、声音、文字与叙事是否形成实质性的新表达",
                 "内部混剪深度警告是否可以接受；不得把阈值解释成平台保证",

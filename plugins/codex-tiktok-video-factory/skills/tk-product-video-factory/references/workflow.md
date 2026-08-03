@@ -5,6 +5,9 @@
 Enumerate every file in `product/` and `SP/`. Record file hashes, dimensions, duration, frame rate,
 audio presence, and processing status. The inventory count is the completion denominator.
 
+Do not begin direction selection until every inventory item has an explicit analyzed, unreadable,
+or failed status. Sampling a few familiar sources is not a substitute for full coverage.
+
 ## 2. Product understanding
 
 Read `product.md` first when present, then inspect every product image. Extract identity, target
@@ -28,8 +31,13 @@ Create stable shot IDs linked to source file and timestamps. Record visual clean
 presence, hard subtitles and meaning, original speech, product visibility, usable duration,
 continuity dependencies, and allowed sales functions.
 
+Classify faces as `real`, `ai_generated`, or `uncertain`. Prefer no-face product demonstrations,
+hands, body details, back views, and brief context shots. Use a real face only when it contributes a
+necessary scene, reaction, or sales function and no cleaner shot serves the same role. Treat
+`uncertain` as real. Do not solve face selection with moving stickers or conspicuous cover blocks.
+
 For hard subtitles, record final-canvas bounding regions and appearance intervals. Choose
-`preserve`, `replace`, or `reject` before the shot enters an edit plan. See `subtitles.md`.
+`preserve`, `crop`, `replace`, or `reject` before the shot enters an edit plan. See `subtitles.md`.
 
 When the user has no self-shot footage, treat that as a constraint rather than a blocker. Split
 sources into short semantic actions instead of preserving complete source arguments. Record source
@@ -86,10 +94,19 @@ rates, random frames, or unrelated layers as an originality strategy.
 When replacing hard subtitles, cover the complete original text interval and place concise,
 synchronized narration captions inside the same region. Do not add a second caption track.
 
+Do not enlarge a mask repeatedly to rescue a poor shot. If the replacement region becomes visually
+dominant, still leaks glyphs, hides the product or hands, or looks unlike a native creator edit,
+reject the shot and select another source. Review a rendered contact sheet and the full-motion video;
+still-frame OCR and technical checks alone cannot approve the result.
+
 ## 8. QA
 
 Run technical and editorial checks. Compare every output against its direction instead of checking
 only file validity. Record failures, warnings, source-usage ratios, and claims used.
+
+Run a separate visual gate that checks every shot for identifiable real faces, subtitle leakage,
+large masks or blurred bands, crop damage, irrelevant inserts, duplicate conclusions, and motion
+continuity. A technical pass cannot override a visual failure.
 
 Review publishing data as part of editorial QA. Keep one stable, searchable product identity across
 the batch; put the per-video angle in the description. Require five to seven relevant tags, including

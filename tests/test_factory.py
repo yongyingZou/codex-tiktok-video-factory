@@ -69,6 +69,35 @@ class FactoryTests(unittest.TestCase):
             errors = factory.pipeline.validate_plan(plan, root)
             self.assertTrue(any("完整覆盖原硬字幕时间" in error for error in errors))
 
+    def test_subtitle_crop_is_valid_and_larger_reframe_is_supported(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP" / "clip.mp4"
+            source.parent.mkdir()
+            source.touch()
+            plan = {
+                "id": "T03",
+                "market": "JP",
+                "locale": "ja-JP",
+                "output": "output/JP/videos/T03.mp4",
+                "publish": {
+                    "product_name": "テスト商品",
+                    "description": "白い服の日の悩みを確認✨",
+                    "tags": ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"],
+                    "hashtag_strategy": {"realtime_hot_verified": False},
+                },
+                "timeline": [{
+                    "source": "SP/clip.mp4",
+                    "start": 0,
+                    "end": 2,
+                    "purpose": "crop edge subtitle without covering the product",
+                    "provenance": {"status": "unknown"},
+                    "transform": {"scale": 1.5, "focus_x": 0.5, "focus_y": 1.0},
+                    "subtitle": {"mode": "crop"},
+                }],
+            }
+            self.assertEqual(factory.pipeline.validate_plan(plan, root), [])
+
     def test_publish_metadata_requires_complete_search_structure(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
