@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "id": "A01",
   "market": "JP",
   "locale": "ja-JP",
@@ -22,6 +22,12 @@
       "end": 2.4,
       "purpose": "hook",
       "spoken_meaning": "Show the problem immediately",
+      "supported_line": "The exact narration line supported by this shot",
+      "action_phase": "reveal",
+      "entry_reason": "Enter on the first readable product reveal",
+      "exit_reason": "Leave after the problem is visually understood",
+      "relation_to_previous": "opening",
+      "attention_role": "Immediate visual curiosity",
       "source_audio": "keep",
       "provenance": {
         "status": "unknown",
@@ -35,6 +41,17 @@
         "contrast": 1.04,
         "saturation": 1.02
       },
+      "speed": {
+        "mode": "normal",
+        "segments": []
+      },
+      "sound": {
+        "ambience": "keep_low",
+        "action_effects": [],
+        "transition_accent": "none"
+      },
+      "text_overlays": [],
+      "renderer": "remotion",
       "subtitle": {
         "mode": "preserve"
       }
@@ -45,6 +62,12 @@
       "end": 5.0,
       "purpose": "solution demonstration",
       "spoken_meaning": "Show how the product solves it",
+      "supported_line": "The exact solution line supported by this action",
+      "action_phase": "key_action",
+      "entry_reason": "Enter immediately before product contact",
+      "exit_reason": "Hold long enough to read the completed result",
+      "relation_to_previous": "problem_to_solution",
+      "attention_role": "Clear product mechanism",
       "source_audio": "mute",
       "provenance": {
         "status": "seller_supplied",
@@ -58,6 +81,24 @@
         "contrast": 1.05,
         "saturation": 1.0
       },
+      "speed": {
+        "mode": "segmented",
+        "segments": [
+          {"start": 0.0, "end": 1.0, "rate": 1.2, "reason": "Shorten setup"},
+          {"start": 1.0, "end": 2.4, "rate": 1.0, "reason": "Keep key action legible"}
+        ]
+      },
+      "sound": {
+        "ambience": "mute",
+        "action_effects": [
+          {"time": 1.15, "id": "soft-click", "reason": "Synchronize visible fastening"}
+        ],
+        "transition_accent": "none"
+      },
+      "text_overlays": [
+        {"start": 1.0, "end": 2.2, "text": "KEY BENEFIT", "purpose": "keyword_emphasis"}
+      ],
+      "renderer": "remotion",
       "subtitle": {
         "mode": "replace",
         "region": {
@@ -111,7 +152,10 @@
   },
   "music": {
     "file": "",
-    "volume": 0.12
+    "volume": 0.12,
+    "fade_in": 0.25,
+    "fade_out": 0.5,
+    "duck_under_voice": true
   },
   "cover": {
     "time": 1.0,

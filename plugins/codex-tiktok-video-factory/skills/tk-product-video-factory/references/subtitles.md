@@ -30,7 +30,11 @@ Keep target captions concise:
 - Express one spoken meaning at a time.
 - Use no more than two lines by default.
 - For Japanese, target roughly 8–14 characters per displayed phrase.
+- Segment Japanese by natural reading and breath groups; do not preserve Chinese word order or
+  force every narrated word onto screen. Prefer familiar Japanese product and scene vocabulary.
 - Time captions to the narration, not merely to clip boundaries.
+- Derive caption intervals from the final synthesized narration segments, including inserted pauses.
+  If a voice segment is regenerated or retimed, invalidate and rebuild its caption cues before render.
 - Keep styling consistent within one finished video.
 - Do not place a second caption track elsewhere when the replacement region already carries it.
 

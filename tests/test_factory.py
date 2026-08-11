@@ -20,6 +20,88 @@ SPEC.loader.exec_module(factory)
 
 
 class FactoryTests(unittest.TestCase):
+    def test_render_gate_requires_complete_analysis_and_baseline_approval(self):
+        with tempfile.TemporaryDirectory() as temp:
+            product = Path(temp)
+            plan = {"production_stage": "batch"}
+            missing = factory.pipeline.validate_workflow_gate(product, plan)
+            self.assertTrue(any("workflow-state.json" in error for error in missing))
+
+            state = {
+                "gates": {
+                    "inventory": {"status": "pass"},
+                    "product_model": {"status": "approved"},
+                    "source_analysis": {
+                        "status": "pass",
+                        "images_total": 2, "images_reviewed": 2,
+                        "videos_total": 3, "videos_reviewed": 3,
+                        "audio_total": 3, "audio_reviewed": 2,
+                        "hard_subtitles_total": 3, "hard_subtitles_reviewed": 3,
+                        "unreported_failures": False,
+                    },
+                    "shot_library": {"status": "pass"},
+                    "directions": {"status": "approved"},
+                    "baseline": {"status": "pending"},
+                }
+            }
+            state_path = product / "analysis/v1/workflow-state.json"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text(__import__("json").dumps(state), encoding="utf-8")
+            (state_path.parent / "product-analysis.md").write_text(
+                "# 商品分析\n\n" + "商品本质、问题产生场景、用户感受、使用场景、解决机制、直接帮助和边界。" * 12,
+                encoding="utf-8",
+            )
+            evidence_path = state_path.parent / "narrative-evidence.json"
+            evidence_path.write_text(__import__("json").dumps({
+                "purchase_thesis": "目标用户在问题场景中遇到具体问题，商品通过机制提供有限帮助",
+                "unresolved_contradictions": [],
+                "lines": [{"line": "supported", "support_status": "supported"}],
+            }), encoding="utf-8")
+            incomplete = factory.pipeline.validate_workflow_gate(product, plan)
+            self.assertTrue(any("audio 未完整" in error for error in incomplete))
+            self.assertTrue(any("基准片尚未" in error for error in incomplete))
+
+            state["gates"]["source_analysis"]["audio_reviewed"] = 3
+            state["gates"]["baseline"]["status"] = "approved"
+            state_path.write_text(__import__("json").dumps(state), encoding="utf-8")
+            self.assertEqual(factory.pipeline.validate_workflow_gate(product, plan), [])
+
+            evidence_path.write_text(__import__("json").dumps({
+                "purchase_thesis": "错误购买逻辑",
+                "unresolved_contradictions": ["问题来源与使用场景冲突"],
+                "lines": [{"line": "unsupported", "support_status": "unsupported"}],
+            }), encoding="utf-8")
+            blocked = factory.pipeline.validate_workflow_gate(product, plan)
+            self.assertTrue(any("未解决矛盾" in error for error in blocked))
+            self.assertTrue(any("无证据" in error for error in blocked))
+
+    def test_schema_v2_requires_editorial_decisions(self):
+        with tempfile.TemporaryDirectory() as folder:
+            product = Path(folder)
+            source = product / "SP" / "clip.mp4"
+            source.parent.mkdir(parents=True)
+            source.touch()
+            plan = {
+                "schema_version": 2,
+                "id": "A01",
+                "market": "JP",
+                "output": "output/JP/videos/A01.mp4",
+                "timeline": [{
+                    "source": "SP/clip.mp4", "start": 0, "end": 1,
+                    "purpose": "hook", "spoken_meaning": "problem",
+                    "provenance": {"status": "unknown"},
+                    "transform": {}, "subtitle": {"mode": "preserve"},
+                }],
+                "publish": {
+                    "product_name": "商品名", "description": "説明",
+                    "tags": ["#商品", "#カテゴリ", "#機能", "#場面", "#悩み"],
+                    "hashtag_strategy": {"realtime_hot_verified": False},
+                },
+            }
+            errors = factory.pipeline.validate_plan(plan, product)
+            self.assertTrue(any("supported_line" in error for error in errors))
+            self.assertTrue(any("renderer" in error for error in errors))
+
     def test_market_aliases_are_unique(self):
         self.assertEqual(factory.resolve_markets(["日本", "TH", "日本"]), ["JP", "TH"])
         self.assertEqual(factory.voice_for("TH", "female"), "th-TH-PremwadeeNeural")

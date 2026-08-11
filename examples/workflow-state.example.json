@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "workflow_version": "3.0",
+  "locks": {
+    "market": "JP",
+    "content_language": "ja-JP",
+    "voice_policy": "confirm_once_then_lock",
+    "face_policy": "avoid_real_faces_allow_confirmed_ai_faces",
+    "publish_document": "single_bilingual_markdown",
+    "duration_policy": "content_driven",
+    "video_count_policy": "direction_driven"
+  },
+  "gates": {
+    "inventory": {
+      "status": "pass"
+    },
+    "product_model": {
+      "status": "approved"
+    },
+    "source_analysis": {
+      "status": "pass",
+      "images_total": 8,
+      "images_reviewed": 8,
+      "videos_total": 12,
+      "videos_reviewed": 12,
+      "audio_total": 12,
+      "audio_reviewed": 12,
+      "hard_subtitles_total": 12,
+      "hard_subtitles_reviewed": 12,
+      "unreported_failures": false,
+      "blocked_items": []
+    },
+    "shot_library": {
+      "status": "pass"
+    },
+    "directions": {
+      "status": "approved"
+    },
+    "baseline": {
+      "status": "pending",
+      "video_id": null,
+      "manual_visual_review": "pending",
+      "manual_audio_review": "pending"
+    }
+  }
+}

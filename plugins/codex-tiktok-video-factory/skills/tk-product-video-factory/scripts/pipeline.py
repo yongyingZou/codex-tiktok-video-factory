@@ -10,6 +10,9 @@ import shutil
 import subprocess
 import tempfile
 import unicodedata
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 
@@ -103,6 +106,7 @@ def preprocess(product: Path, inventory: dict, *, force: bool = False) -> dict:
 
 def validate_plan(plan: dict, product: Path) -> list[str]:
     errors: list[str] = []
+    schema_version = int(plan.get("schema_version", 1))
     for key in ("id", "market", "timeline", "output"):
         if not plan.get(key):
             errors.append(f"缺少字段：{key}")
@@ -128,6 +132,23 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
                 f"片段 {index} 必须声明素材来源状态：self_shot、authorized、"
                 "seller_supplied 或 unknown"
             )
+        if schema_version >= 2:
+            editorial_fields = (
+                "spoken_meaning", "supported_line", "action_phase", "entry_reason",
+                "exit_reason", "relation_to_previous", "attention_role", "speed",
+                "sound", "text_overlays", "renderer",
+            )
+            for field in editorial_fields:
+                if field not in clip or clip[field] in (None, ""):
+                    errors.append(f"片段 {index} 缺少剪辑决策字段 {field}")
+            if clip.get("renderer") not in {"remotion", "ffmpeg"}:
+                errors.append(f"片段 {index} 的 renderer 必须是 remotion 或 ffmpeg")
+            if not isinstance(clip.get("text_overlays"), list):
+                errors.append(f"片段 {index} 的 text_overlays 必须是列表")
+            if not isinstance(clip.get("speed"), dict):
+                errors.append(f"片段 {index} 的 speed 必须是对象")
+            if not isinstance(clip.get("sound"), dict):
+                errors.append(f"片段 {index} 的 sound 必须是对象")
         transform = clip.get("transform", {})
         transform_limits = {
             "scale": (1.0, 1.5),
@@ -200,6 +221,59 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
     strategy = publish.get("hashtag_strategy", {})
     if not isinstance(strategy.get("realtime_hot_verified"), bool):
         errors.append("发布资料必须声明话题标签是否经过实时热门验证")
+    return errors
+
+
+def validate_workflow_gate(product: Path, plan: dict) -> list[str]:
+    """Block rendering when semantic or human-review stages are incomplete."""
+    state_path = product / "analysis" / "v1" / "workflow-state.json"
+    if not state_path.is_file():
+        return [
+            "缺少 analysis/v1/workflow-state.json；完整素材分析和确认状态未知，禁止渲染"
+        ]
+    state = load(state_path)
+    gates = state.get("gates", {})
+    errors: list[str] = []
+    product_analysis = product / "analysis" / "v1" / "product-analysis.md"
+    if not product_analysis.is_file() or len(product_analysis.read_text(encoding="utf-8").strip()) < 200:
+        errors.append("缺少有效的人工商品语义分析 product-analysis.md；禁止渲染")
+    evidence_path = product / "analysis" / "v1" / "narrative-evidence.json"
+    if not evidence_path.is_file():
+        errors.append("缺少逐句叙事证据 narrative-evidence.json；禁止渲染")
+    else:
+        evidence = load(evidence_path)
+        if not str(evidence.get("purchase_thesis", "")).strip():
+            errors.append("叙事证据缺少 purchase_thesis；禁止渲染")
+        if evidence.get("unresolved_contradictions", []):
+            errors.append("叙事证据仍有未解决矛盾；禁止渲染")
+        blocked_lines = [
+            item for item in evidence.get("lines", [])
+            if item.get("support_status") in {"unsupported", "contradicted"}
+        ]
+        if blocked_lines:
+            errors.append("存在无证据或相互矛盾的口播句；禁止渲染")
+    required = ("inventory", "product_model", "source_analysis", "shot_library", "directions")
+    for name in required:
+        status = gates.get(name, {}).get("status")
+        if status not in {"pass", "approved"}:
+            errors.append(f"工作流门禁 {name} 未通过：{status or 'missing'}")
+
+    analysis = gates.get("source_analysis", {})
+    for media in ("images", "videos", "audio", "hard_subtitles"):
+        total = analysis.get(f"{media}_total")
+        reviewed = analysis.get(f"{media}_reviewed")
+        if total is None or reviewed is None:
+            errors.append(f"source_analysis 缺少 {media} 完整度计数")
+        elif int(reviewed) != int(total):
+            errors.append(f"source_analysis 的 {media} 未完整：{reviewed}/{total}")
+    if analysis.get("unreported_failures"):
+        errors.append("source_analysis 仍有未说明的失败项")
+
+    stage = plan.get("production_stage")
+    if stage not in {"baseline", "batch"}:
+        errors.append("剪辑计划必须声明 production_stage：baseline 或 batch")
+    if stage == "batch" and gates.get("baseline", {}).get("status") != "approved":
+        errors.append("基准片尚未通过完整人工视听审核，禁止批量渲染")
     return errors
 
 
@@ -354,8 +428,48 @@ def _tts(plan: dict, target: Path) -> Path | None:
     text = voice.get("text", "").strip()
     if not text or voice.get("provider") == "none":
         return None
-    if voice.get("provider", "edge-tts") != "edge-tts":
-        raise ValueError("通用渲染器当前只自动执行 edge-tts；其他提供商需先生成 voiceover.file")
+    provider = voice.get("provider", "edge-tts")
+    if provider == "aivisspeech":
+        api = voice.get("api", "http://127.0.0.1:10101").rstrip("/")
+        speaker = voice.get("speaker")
+        if speaker is None:
+            raise ValueError("AivisSpeech 口播必须在 voiceover.speaker 中指定已确认的 style ID")
+        try:
+            query_url = api + "/audio_query?" + urllib.parse.urlencode(
+                {"text": text, "speaker": int(speaker)}
+            )
+            request = urllib.request.Request(query_url, data=b"", method="POST")
+            with urllib.request.urlopen(request, timeout=10) as response:
+                query = json.loads(response.read().decode("utf-8"))
+            query["speedScale"] = float(voice.get("speed_scale", query.get("speedScale", 1.0)))
+            query["pitchScale"] = float(voice.get("pitch_scale", query.get("pitchScale", 0.0)))
+            query["intonationScale"] = float(
+                voice.get("intonation_scale", query.get("intonationScale", 1.0))
+            )
+            query["volumeScale"] = float(voice.get("volume_scale", query.get("volumeScale", 1.0)))
+            query["prePhonemeLength"] = float(
+                voice.get("pre_phoneme_length", query.get("prePhonemeLength", 0.05))
+            )
+            query["postPhonemeLength"] = float(
+                voice.get("post_phoneme_length", query.get("postPhonemeLength", 0.08))
+            )
+            synthesis_url = api + "/synthesis?" + urllib.parse.urlencode({"speaker": int(speaker)})
+            synthesis = urllib.request.Request(
+                synthesis_url,
+                data=json.dumps(query, ensure_ascii=False).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(synthesis, timeout=120) as response:
+                target.write_bytes(response.read())
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as error:
+            raise RuntimeError(
+                "AivisSpeech 当前不可用。请启动 AivisSpeech 并确认 127.0.0.1:10101 可访问；"
+                "渲染器不会静默回退到 Edge TTS。"
+            ) from error
+        return target
+    if provider != "edge-tts":
+        raise ValueError(f"通用渲染器不支持口播提供商：{provider}")
     binary = shutil.which("edge-tts")
     if not binary:
         runtime = __import__("sys")
@@ -373,7 +487,7 @@ def _tts(plan: dict, target: Path) -> Path | None:
 
 def render(product: Path, plan_path: Path) -> dict:
     plan = load(plan_path)
-    errors = validate_plan(plan, product)
+    errors = validate_plan(plan, product) + validate_workflow_gate(product, plan)
     if errors:
         raise ValueError("\n".join(errors))
     width = int(plan.get("canvas", {}).get("width", 1080))
@@ -574,6 +688,18 @@ def qa(product: Path, plan_path: Path) -> dict:
         check("no_exact_duplicate_ranges", not duplicates, duplicates)
         purposes = [clip.get("purpose") for clip in plan["timeline"]]
         check("timeline_has_sales_purpose", all(purposes), purposes)
+        if int(plan.get("schema_version", 1)) >= 2:
+            editorial_fields = (
+                "supported_line", "action_phase", "entry_reason", "exit_reason",
+                "relation_to_previous", "attention_role", "speed", "sound", "renderer",
+            )
+            missing_editorial = [
+                {"clip": index, "field": field}
+                for index, clip in enumerate(plan["timeline"], 1)
+                for field in editorial_fields
+                if field not in clip or clip[field] in (None, "")
+            ]
+            check("editorial_decisions_complete", not missing_editorial, missing_editorial)
         publish = plan.get("publish", {})
         check("product_name_length", len(publish.get("product_name", "")) <= 30, publish.get("product_name"))
         symbol_chars = [
@@ -648,6 +774,9 @@ def qa(product: Path, plan_path: Path) -> dict:
                 "裁切是否损伤商品主体、手部动作或使用效果",
                 "替换字幕是否与口播同步且没有闪出原硬字幕",
                 "画面、声音、文字与叙事是否形成实质性的新表达",
+                "每个切点是否由动作或语义驱动，而不是机械按时长切割",
+                "局部变速、文字、转场和音效是否确有叙事作用",
+                "完整观看时口播、动作声、环境声和BGM是否自然衔接",
                 "内部混剪深度警告是否可以接受；不得把阈值解释成平台保证",
             ],
         }
