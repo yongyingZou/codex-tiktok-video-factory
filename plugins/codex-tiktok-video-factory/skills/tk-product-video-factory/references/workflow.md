@@ -117,6 +117,15 @@ is allowed when it serves a genuinely different meaning, but changing only shot 
 wording, or the opening clip does not create a new sales direction. Give each video a different
 viewer problem, purchase reason, supporting-shot combination, and ending where the assets allow it.
 
+When adding a video to a product that already has finished plans, historical edit plans are
+exclusion references, not the candidate-shot pool. Select from the complete semantic shot library
+again. Declare the new purchase reason, how it differs from history, and that selection was based on
+the shot library. Before rendering, compare source intervals against every historical plan using
+duration overlap, trimmed/near-identical shot reuse, opening reuse, ending reuse, and sales-direction
+identity. A failed comparison blocks rendering; changing narration, music, transforms, filenames,
+or a few cut boundaries cannot override the failure. If the remaining material cannot support a
+materially new argument, report insufficient footage instead of manufacturing another version.
+
 For every proposed hook, compare its source time range with the source video's opening. Reject a
 hook that directly reuses the recognizable original opening sequence. Prefer another source or a
 later self-contained action, while preserving enough setup and result for the hook to remain clear.
@@ -187,6 +196,11 @@ Run a full-motion editorial gate with sound. Check action-cut accuracy, shot-to-
 narration-picture agreement, motivated text and effects, action-sound synchronization, voice/BGM
 balance, silent tails, and whether the completed video communicates one understandable purchase
 reason. Contact sheets and automated reports are supporting evidence only.
+
+For every additional video, place the new and historical outputs side by side and watch them in
+full with sound. Automated uniqueness metrics are a pre-render gate, not editorial approval. The
+reviewer must answer whether an ordinary viewer would perceive a new argument and a substantially
+different visual construction. Record the comparison result in the QA report.
 
 Repeat the contradiction check on the finished script: cause versus symptom, cause versus use
 scene, mechanism versus claimed result, and creator tactic versus verified fact. A technically

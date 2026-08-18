@@ -4,6 +4,11 @@
   "market": "JP",
   "locale": "ja-JP",
   "direction": "One clear customer problem and one product solution",
+  "novelty": {
+    "selection_basis": "shot_library",
+    "purchase_reason": "The independent reason this viewer would buy",
+    "difference_from_history": "How the argument and supporting visual construction differ from existing outputs"
+  },
   "claims": [
     {
       "text": "A claim used in this video",

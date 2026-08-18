@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -244,6 +245,86 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(report["status"], "review")
         self.assertEqual(report["metrics"]["unique_source_count"], 2)
         self.assertIn("不是TikTok官方阈值", report["disclaimer"])
+
+    def test_compare_edit_plans_detects_trimmed_historical_reuse(self):
+        historical = {
+            "id": "A01",
+            "direction": "運転中のUV対策",
+            "timeline": [
+                {"source": "SP/a.mp4", "start": 1.0, "end": 3.0},
+                {"source": "SP/b.mp4", "start": 4.0, "end": 6.0},
+            ],
+        }
+        candidate = {
+            "id": "B01",
+            "direction": "暑さの不安",
+            "timeline": [
+                {"source": "SP/a.mp4", "start": 1.1, "end": 2.9},
+                {"source": "SP/b.mp4", "start": 4.2, "end": 5.8},
+            ],
+        }
+        report = factory.pipeline.compare_edit_plans(candidate, historical)
+        self.assertGreater(report["duration_overlap_share"], 0.9)
+        self.assertEqual(report["reused_shot_share"], 1.0)
+
+    def test_historical_uniqueness_blocks_old_plan_as_candidate_pool(self):
+        with tempfile.TemporaryDirectory() as temp:
+            product = Path(temp)
+            plans = product / "output/JP/edit-plans"
+            plans.mkdir(parents=True)
+            historical = {
+                "id": "A01",
+                "market": "JP",
+                "direction": "UV対策",
+                "timeline": [
+                    {"source": "SP/a.mp4", "start": 1.0, "end": 3.0},
+                    {"source": "SP/b.mp4", "start": 4.0, "end": 6.0},
+                ],
+            }
+            (plans / "A01.json").write_text(json.dumps(historical), encoding="utf-8")
+            candidate = {
+                "id": "B01",
+                "market": "JP",
+                "direction": "暑さの不安",
+                "timeline": [
+                    {"source": "SP/a.mp4", "start": 1.1, "end": 2.9},
+                    {"source": "SP/b.mp4", "start": 4.2, "end": 5.8},
+                ],
+                "novelty": {
+                    "selection_basis": "shot_library",
+                    "purchase_reason": "暑さへの不安",
+                    "difference_from_history": "運転ではなく素材の使用感",
+                },
+            }
+            candidate_path = plans / "B01.json"
+            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+            report = factory.pipeline.historical_uniqueness(product, candidate_path, candidate)
+            self.assertEqual(report["status"], "fail")
+            self.assertTrue(report["failures"])
+
+    def test_historical_uniqueness_accepts_distinct_shot_library_selection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            product = Path(temp)
+            plans = product / "output/JP/edit-plans"
+            plans.mkdir(parents=True)
+            historical = {
+                "id": "A01", "market": "JP", "direction": "UV対策",
+                "timeline": [{"source": "SP/a.mp4", "start": 1.0, "end": 3.0}],
+            }
+            (plans / "A01.json").write_text(json.dumps(historical), encoding="utf-8")
+            candidate = {
+                "id": "B01", "market": "JP", "direction": "暑さの不安",
+                "timeline": [{"source": "SP/c.mp4", "start": 5.0, "end": 7.0}],
+                "novelty": {
+                    "selection_basis": "shot_library",
+                    "purchase_reason": "暑さへの不安",
+                    "difference_from_history": "別の問題と別素材",
+                },
+            }
+            candidate_path = plans / "B01.json"
+            candidate_path.write_text(json.dumps(candidate), encoding="utf-8")
+            report = factory.pipeline.historical_uniqueness(product, candidate_path, candidate)
+            self.assertEqual(report["status"], "pass")
 
     def test_feedback_command_records_violation_event(self):
         with tempfile.TemporaryDirectory() as temp:

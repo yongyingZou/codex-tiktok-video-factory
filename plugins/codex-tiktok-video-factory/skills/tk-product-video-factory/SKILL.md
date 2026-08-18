@@ -60,6 +60,10 @@ and FFmpeg as supporting and execution tools.
   unless it creates a complete and credible buying reason.
 - Use one clear sales logic per finished video. Multiple clips may support that logic.
 - Do not create variants by merely reordering the same shots. Track source and shot reuse.
+- Treat historical edit plans as exclusion references, never as the candidate-shot pool for a new
+  video. Select again from the complete shot library and block rendering when source-range overlap,
+  trimmed near-duplicate shots, repeated openings/endings, or the same purchase reason exceed the
+  internal historical-uniqueness policy.
 - Do not use a source video's recognizable original opening sequence as the finished video's
   opening. Build the new hook from a different source or a later self-contained action. A useful
   source opening may appear later only when it supports the new narrative; do not preserve its

@@ -485,9 +485,118 @@ def _tts(plan: dict, target: Path) -> Path | None:
     return target
 
 
+def _range_overlap(left: dict, right: dict) -> float:
+    if left.get("source") != right.get("source"):
+        return 0.0
+    return max(
+        0.0,
+        min(float(left["end"]), float(right["end"]))
+        - max(float(left["start"]), float(right["start"])),
+    )
+
+
+def compare_edit_plans(candidate: dict, historical: dict) -> dict:
+    """Measure semantic shot-range reuse, including trimmed near-duplicates."""
+    current = candidate.get("timeline", [])
+    previous = historical.get("timeline", [])
+    durations = [max(0.0, float(clip["end"]) - float(clip["start"])) for clip in current]
+    total = sum(durations)
+    covered = 0.0
+    reused = 0
+    for clip, duration in zip(current, durations):
+        overlap = max((_range_overlap(clip, old) for old in previous), default=0.0)
+        covered += min(duration, overlap)
+        if duration and overlap / duration >= 0.6:
+            reused += 1
+    first_overlap = 0.0
+    last_overlap = 0.0
+    if current and previous:
+        first_duration = durations[0]
+        last_duration = durations[-1]
+        if first_duration:
+            first_overlap = _range_overlap(current[0], previous[0]) / first_duration
+        if last_duration:
+            last_overlap = _range_overlap(current[-1], previous[-1]) / last_duration
+    return {
+        "historical_id": historical.get("id"),
+        "historical_direction": historical.get("direction"),
+        "duration_overlap_share": round(covered / total, 3) if total else 0.0,
+        "reused_shot_share": round(reused / len(current), 3) if current else 0.0,
+        "opening_overlap_share": round(first_overlap, 3),
+        "ending_overlap_share": round(last_overlap, 3),
+        "same_direction": bool(candidate.get("direction"))
+        and candidate.get("direction") == historical.get("direction"),
+    }
+
+
+def historical_uniqueness(product: Path, plan_path: Path, plan: dict) -> dict:
+    """Hard production gate for additions to an existing product/market batch."""
+    market = plan.get("market", "UNKNOWN")
+    plans_dir = product / "output" / market / "edit-plans"
+    comparisons = []
+    for path in sorted(plans_dir.glob("*.json")):
+        if path.resolve() == plan_path.resolve():
+            continue
+        historical = load(path)
+        comparisons.append(compare_edit_plans(plan, historical))
+    policy = {
+        "max_duration_overlap_share": 0.55,
+        "max_reused_shot_share": 0.60,
+        "max_opening_overlap_share": 0.50,
+        "max_ending_overlap_share": 0.50,
+        **plan.get("historical_uniqueness_policy", {}),
+    }
+    novelty = plan.get("novelty", {})
+    declaration_errors = []
+    if comparisons:
+        if novelty.get("selection_basis") != "shot_library":
+            declaration_errors.append("新增视频必须声明 novelty.selection_basis=shot_library")
+        if not str(novelty.get("purchase_reason", "")).strip():
+            declaration_errors.append("新增视频必须声明独立购买理由 novelty.purchase_reason")
+        if not str(novelty.get("difference_from_history", "")).strip():
+            declaration_errors.append("新增视频必须说明 novelty.difference_from_history")
+    failures = []
+    for item in comparisons:
+        reasons = []
+        if item["duration_overlap_share"] > policy["max_duration_overlap_share"]:
+            reasons.append("与历史成片的源画面时长重合过高")
+        if item["reused_shot_share"] > policy["max_reused_shot_share"]:
+            reasons.append("大部分镜头是历史镜头的相同或裁短版本")
+        if item["opening_overlap_share"] > policy["max_opening_overlap_share"]:
+            reasons.append("开头重复历史成片")
+        if item["ending_overlap_share"] > policy["max_ending_overlap_share"]:
+            reasons.append("结尾重复历史成片")
+        if item["same_direction"]:
+            reasons.append("销售方向与历史成片相同")
+        if reasons:
+            failures.append({**item, "reasons": reasons})
+    return {
+        "status": "fail" if declaration_errors or failures else "pass",
+        "policy": policy,
+        "declaration_errors": declaration_errors,
+        "comparisons": comparisons,
+        "failures": failures,
+        "note": "内部生产排重闸门，不是平台审核阈值；通过后仍需并排完整观看。",
+    }
+
+
 def render(product: Path, plan_path: Path) -> dict:
     plan = load(plan_path)
     errors = validate_plan(plan, product) + validate_workflow_gate(product, plan)
+    uniqueness = historical_uniqueness(product, plan_path, plan)
+    if uniqueness["status"] == "fail":
+        save(
+            product / f"output/{plan.get('market', 'UNKNOWN')}/reports/"
+            f"{plan.get('id', 'unknown')}-historical-uniqueness.json",
+            uniqueness,
+        )
+        errors.append(
+            "历史成片排重失败："
+            + json.dumps(
+                uniqueness["declaration_errors"] + uniqueness["failures"],
+                ensure_ascii=False,
+            )
+        )
     if errors:
         raise ValueError("\n".join(errors))
     width = int(plan.get("canvas", {}).get("width", 1080))
@@ -686,6 +795,8 @@ def qa(product: Path, plan_path: Path) -> dict:
                 duplicates.append(key)
             seen.add(key)
         check("no_exact_duplicate_ranges", not duplicates, duplicates)
+        uniqueness = historical_uniqueness(product, plan_path, plan)
+        check("historical_video_uniqueness", uniqueness["status"] == "pass", uniqueness)
         purposes = [clip.get("purpose") for clip in plan["timeline"]]
         check("timeline_has_sales_purpose", all(purposes), purposes)
         if int(plan.get("schema_version", 1)) >= 2:
@@ -790,32 +901,30 @@ def qa_batch(product: Path, market: str) -> dict:
     plans = []
     for path in sorted(plans_dir.glob("*.json")):
         plan = load(path)
-        ranges = {
-            (c["source"], round(float(c["start"]), 1), round(float(c["end"]), 1))
-            for c in plan.get("timeline", [])
-        }
-        plans.append({"path": str(path), "id": plan.get("id"), "direction": plan.get("direction"), "ranges": ranges})
+        plans.append({"path": str(path), "plan": plan})
     comparisons = []
     for left_index, left in enumerate(plans):
         for right in plans[left_index + 1:]:
-            union = left["ranges"] | right["ranges"]
-            overlap = left["ranges"] & right["ranges"]
-            ratio = len(overlap) / len(union) if union else 0
+            metrics = compare_edit_plans(right["plan"], left["plan"])
+            failed = (
+                metrics["duration_overlap_share"] > 0.55
+                or metrics["reused_shot_share"] > 0.60
+                or metrics["opening_overlap_share"] > 0.50
+                or metrics["ending_overlap_share"] > 0.50
+                or metrics["same_direction"]
+            )
             comparisons.append({
-                "left": left["id"],
-                "right": right["id"],
-                "exact_range_jaccard": round(ratio, 3),
-                "same_direction": bool(left["direction"]) and left["direction"] == right["direction"],
-                "status": "fail" if ratio > 0.5 or (
-                    left["direction"] and left["direction"] == right["direction"]
-                ) else "pass",
+                "left": left["plan"].get("id"),
+                "right": right["plan"].get("id"),
+                **metrics,
+                "status": "fail" if failed else "pass",
             })
     report = {
         "status": "pass" if all(c["status"] == "pass" for c in comparisons) else "fail",
         "market": market,
         "plan_count": len(plans),
         "comparisons": comparisons,
-        "note": "该检查只能识别相同时间段和相同方向，不能替代对叙事逻辑的人工复核。",
+        "note": "同时识别完全相同和裁短后的近似时间段；仍不能替代新旧成片并排完整观看。",
     }
     save(product / f"output/{market}/reports/batch-diversity.json", report)
     return report
