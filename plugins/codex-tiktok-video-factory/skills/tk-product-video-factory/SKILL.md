@@ -135,6 +135,9 @@ contain the Chinese checks. Create Japanese descriptions and hashtags directly f
 Japanese commerce-video language and Japanese search/category usage; never translate Chinese copy
 literally or use Chinese ecommerce phrasing with Japanese words substituted. Chinese is a
 post-writing meaning check only. Keep each target-market description within 3000 characters.
+Keep one durable `publish/<video-id>.json` record per video and regenerate the consolidated Markdown
+from all records so adding a video cannot erase earlier publishing data. Do not use narration as the
+description with only a CTA appended. Require a non-empty Chinese meaning for every hashtag.
 
 ## Quality gate
 

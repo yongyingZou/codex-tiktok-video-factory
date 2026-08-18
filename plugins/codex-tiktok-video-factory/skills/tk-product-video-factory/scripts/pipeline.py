@@ -13,6 +13,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from difflib import SequenceMatcher
 from pathlib import Path
 
 
@@ -32,6 +33,87 @@ def load(path: Path) -> dict:
 def save(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _normalized_copy(text: str) -> str:
+    return "".join(char for char in text.lower() if char.isalnum())
+
+
+def _description_reuses_narration(publish: dict) -> bool:
+    narration = _normalized_copy(str(publish.get("narration", "")))
+    description = _normalized_copy(str(publish.get("description", "")))
+    if not narration or not description:
+        return False
+    if narration in description or description in narration:
+        return True
+    return SequenceMatcher(None, narration, description).ratio() >= 0.82
+
+
+def write_consolidated_publish_markdown(product: Path, market: str) -> Path:
+    """Rebuild the human deliverable from all per-video records without dropping history."""
+    publish_dir = product / "output" / market / "publish"
+    target = product / "output" / market / "发布资料_中日对照.md"
+    marker = "<!-- tk-video-factory:consolidated-publish-v1 -->"
+    legacy = ""
+    if target.is_file():
+        existing = target.read_text(encoding="utf-8")
+        if marker not in existing:
+            legacy = existing.strip()
+    sections = [marker, "", f"# {market} 发布资料（中日文对照）"]
+    for path in sorted(publish_dir.glob("*.json")):
+        item = load(path)
+        video_id = path.stem
+        sections.extend([
+            "",
+            f"## {video_id}",
+            "",
+            "### 商品名称",
+            f"- 日文：{item.get('product_name', '')}",
+            f"- 中文：{item.get('product_name_cn', '')}",
+            "",
+            "### 视频方向",
+            f"- 日文：{item.get('direction', '')}",
+            f"- 中文：{item.get('direction_cn', '')}",
+            "",
+            "### 封面文案",
+            f"- 日文：{item.get('cover_copy', '')}",
+            f"- 中文：{item.get('cover_copy_cn', '')}",
+            "",
+            "### 口播",
+            f"- 日文：{item.get('narration', '')}",
+            f"- 中文：{item.get('narration_cn', '')}",
+            "",
+            "### 视频描述（不是口播复写）",
+            f"- 日文：{item.get('description', '')}",
+            f"- 中文：{item.get('description_cn', '')}",
+            "",
+            "### 行动引导",
+            f"- 日文：{item.get('cta', '')}",
+            f"- 中文：{item.get('cta_cn', '')}",
+            "",
+            "### 话题标签",
+            "| 日文标签 | 中文含义 |",
+            "| --- | --- |",
+        ])
+        translations = {
+            row.get("tag"): row.get("meaning_cn", "")
+            for row in item.get("tag_translations", [])
+            if isinstance(row, dict)
+        }
+        for tag in item.get("tags", []):
+            sections.append(f"| {tag} | {translations.get(tag, '')} |")
+    if legacy:
+        sections.extend([
+            "",
+            "---",
+            "",
+            "## 历史发布资料（旧格式原样保留）",
+            "",
+            legacy,
+        ])
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("\n".join(sections).rstrip() + "\n", encoding="utf-8")
+    return target
 
 
 def media_info(path: Path) -> dict:
@@ -213,11 +295,31 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
         errors.append("发布资料缺少商品名称")
     if not publish.get("description", "").strip():
         errors.append("发布资料缺少与本条视频对应的描述")
+    bilingual_fields = (
+        "product_name_cn", "direction", "direction_cn", "cover_copy", "cover_copy_cn",
+        "narration", "narration_cn", "description_cn", "cta", "cta_cn",
+    )
+    for field in bilingual_fields:
+        if not str(publish.get(field, "")).strip():
+            errors.append(f"发布资料缺少中日文对照字段：{field}")
+    if _description_reuses_narration(publish):
+        errors.append("视频描述不能直接复制或轻微改写口播；应重新表达商品、视频钩子和点击理由")
     tags = publish.get("tags", [])
     if not isinstance(tags, list) or not 5 <= len(tags) <= 7:
         errors.append("发布资料需要5到7个相关话题标签")
     elif any(not isinstance(tag, str) or not tag.startswith("#") or len(tag) < 2 for tag in tags):
         errors.append("每个话题标签必须是以#开头的非空字符串")
+    translations = publish.get("tag_translations", [])
+    translated = {
+        row.get("tag"): row.get("meaning_cn")
+        for row in translations
+        if isinstance(row, dict)
+    } if isinstance(translations, list) else {}
+    missing_tag_translations = [
+        tag for tag in tags if not str(translated.get(tag, "")).strip()
+    ]
+    if missing_tag_translations:
+        errors.append(f"以下话题标签缺少中文含义：{missing_tag_translations}")
     strategy = publish.get("hashtag_strategy", {})
     if not isinstance(strategy.get("realtime_hot_verified"), bool):
         errors.append("发布资料必须声明话题标签是否经过实时热门验证")
@@ -682,11 +784,13 @@ def render(product: Path, plan_path: Path) -> dict:
     ])
     publish = product / f"output/{plan['market']}/publish/{plan['id']}.json"
     save(publish, plan.get("publish", {}))
+    consolidated_publish = write_consolidated_publish_markdown(product, plan["market"])
     result = {
         "status": "rendered",
         "video": str(output),
         "cover": str(cover),
         "publish": str(publish),
+        "consolidated_publish": str(consolidated_publish),
         "duration": media_info(output)["duration"],
         "narration_duration": narration_duration,
     }

@@ -213,10 +213,20 @@ CTA. Do not publish a generic product paragraph or a footage-only summary. Requi
 stable product/category tags and video-specific tags. Record real-time trend verification separately
 so relevance guesses are never presented as current hot tags.
 
+Narration and description are separate assets. Narration carries the timed spoken argument; the
+description identifies the product, reframes this video's hook/value for feed and search context,
+and supplies a concise click reason. Do not paste the narration into the description or append a CTA
+to an otherwise identical transcript. Automated validation blocks direct and near-direct copies.
+
 The consolidated publishing document must provide target-market text and Chinese meaning side by
 side for every publish-facing item: product name, video direction, cover copy, narration,
 description, CTA, and each hashtag. Keep the target-market description within 3000 characters. The
 Chinese text is an internal review aid and must not be mixed into the actual target-market fields.
+Store each video's publishing record separately under `publish/<video-id>.json`. Whenever a new
+video is rendered, rebuild the consolidated bilingual Markdown from all per-video records; never
+overwrite it with only the newest entry. Preserve an unstructured legacy Markdown document verbatim
+until it has been migrated. Every hashtag row must contain the target-market tag and a non-empty
+Chinese meaning.
 
 For Japan, write descriptions and hashtags natively in Japanese from the start. Use Japanese
 product-category vocabulary, natural social-commerce phrasing, and search terms Japanese shoppers

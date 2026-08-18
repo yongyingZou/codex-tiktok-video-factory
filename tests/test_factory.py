@@ -20,6 +20,32 @@ assert SPEC.loader
 SPEC.loader.exec_module(factory)
 
 
+def complete_publish(**overrides):
+    tags = ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"]
+    value = {
+        "product_name": "テスト商品",
+        "product_name_cn": "测试商品",
+        "direction": "白い服の日の悩み",
+        "direction_cn": "白色衣服场景的烦恼",
+        "cover_copy": "白い服の日に",
+        "cover_copy_cn": "穿白色衣服时",
+        "narration": "白い服の日は、見え方が気になります。商品で整えやすくします。",
+        "narration_cn": "穿白色衣服时会在意外观，这款商品更容易整理。",
+        "description": "白い服に合わせやすい商品のポイントを動画で紹介✨ 詳細は商品ページへ。",
+        "description_cn": "视频介绍适合白色衣服的商品要点，详情请查看商品页。",
+        "cta": "詳細は商品ページへ。",
+        "cta_cn": "详情请查看商品页。",
+        "tags": tags,
+        "tag_translations": [
+            {"tag": tag, "meaning_cn": meaning}
+            for tag, meaning in zip(tags, ["商品", "类别", "特点", "场景", "烦恼"])
+        ],
+        "hashtag_strategy": {"realtime_hot_verified": False},
+    }
+    value.update(overrides)
+    return value
+
+
 class FactoryTests(unittest.TestCase):
     def test_render_gate_requires_complete_analysis_and_baseline_approval(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -163,12 +189,7 @@ class FactoryTests(unittest.TestCase):
                 "market": "JP",
                 "locale": "ja-JP",
                 "output": "output/JP/videos/T03.mp4",
-                "publish": {
-                    "product_name": "テスト商品",
-                    "description": "白い服の日の悩みを確認✨",
-                    "tags": ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"],
-                    "hashtag_strategy": {"realtime_hot_verified": False},
-                },
+                "publish": complete_publish(),
                 "timeline": [{
                     "source": "SP/clip.mp4",
                     "start": 0,
@@ -213,18 +234,54 @@ class FactoryTests(unittest.TestCase):
             self.assertTrue(any("实时热门验证" in error for error in errors))
 
             valid = dict(base)
-            valid["publish"] = {
-                "product_name": "テスト商品",
-                "description": "悩みから商品の変化まで伝える説明です✨",
-                "description_cn": "中文核对",
-                "tags": ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"],
-                "hashtag_strategy": {
-                    "core_product": ["#商品", "#カテゴリ"],
-                    "video_specific": ["#特徴", "#場面", "#悩み"],
-                    "realtime_hot_verified": False,
-                },
-            }
+            valid["publish"] = complete_publish()
             self.assertEqual(factory.pipeline.validate_plan(valid, root), [])
+
+    def test_publish_metadata_rejects_narration_copied_as_description(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP/clip.mp4"
+            source.parent.mkdir(parents=True)
+            source.touch()
+            copied = "夏の日差しが気になる時は、この商品で腕を覆います。"
+            plan = {
+                "id": "T04", "market": "JP", "locale": "ja-JP",
+                "output": "output/JP/videos/T04.mp4",
+                "timeline": [{
+                    "source": "SP/clip.mp4", "start": 0, "end": 2,
+                    "purpose": "hook", "provenance": {"status": "unknown"},
+                    "subtitle": {"mode": "preserve"},
+                }],
+                "publish": complete_publish(
+                    narration=copied,
+                    description=copied + " 詳細は商品ページへ。",
+                ),
+            }
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("不能直接复制" in error for error in errors))
+
+    def test_consolidated_publish_preserves_entries_and_bilingual_tags(self):
+        with tempfile.TemporaryDirectory() as temp:
+            product = Path(temp)
+            publish_dir = product / "output/JP/publish"
+            publish_dir.mkdir(parents=True)
+            (product / "output/JP/发布资料_中日对照.md").write_text(
+                "旧版人工备注，不得丢失。\n", encoding="utf-8"
+            )
+            factory.pipeline.save(publish_dir / "A01.json", complete_publish())
+            factory.pipeline.save(
+                publish_dir / "B01.json",
+                complete_publish(direction="別の方向", direction_cn="另一个方向"),
+            )
+            target = factory.pipeline.write_consolidated_publish_markdown(product, "JP")
+            text = target.read_text(encoding="utf-8")
+            self.assertIn("## A01", text)
+            self.assertIn("## B01", text)
+            self.assertIn("| #商品 | 商品 |", text)
+            self.assertIn("旧版人工备注，不得丢失。", text)
+            factory.pipeline.write_consolidated_publish_markdown(product, "JP")
+            second = target.read_text(encoding="utf-8")
+            self.assertEqual(second.count("## A01"), 1)
 
     def test_remix_depth_reports_internal_risk_without_claiming_platform_guarantee(self):
         plan = {

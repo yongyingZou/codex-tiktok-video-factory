@@ -168,9 +168,25 @@
   },
   "publish": {
     "product_name": "Stable product name within 30 chars",
+    "product_name_cn": "稳定、可搜索的中文商品名称",
+    "direction": "Target-market direction for this video",
+    "direction_cn": "本条视频方向的中文核对",
+    "cover_copy": "Target-market cover copy",
+    "cover_copy_cn": "封面文案的中文核对",
+    "narration": "Complete spoken narration for this video.",
+    "narration_cn": "完整口播的中文核对",
     "description": "Pain or hook, visible product value, and a natural product-link CTA ✨",
     "description_cn": "Concise Chinese meaning check for the user",
+    "cta": "Natural target-market product-link CTA",
+    "cta_cn": "行动引导的中文核对",
     "tags": ["#core_product", "#category", "#feature", "#scene", "#problem"],
+    "tag_translations": [
+      {"tag": "#core_product", "meaning_cn": "核心商品词"},
+      {"tag": "#category", "meaning_cn": "商品类别词"},
+      {"tag": "#feature", "meaning_cn": "本条功能词"},
+      {"tag": "#scene", "meaning_cn": "本条场景词"},
+      {"tag": "#problem", "meaning_cn": "本条痛点词"}
+    ],
     "hashtag_strategy": {
       "core_product": ["#core_product", "#category"],
       "video_specific": ["#feature", "#scene", "#problem"],

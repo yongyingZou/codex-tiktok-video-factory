@@ -73,3 +73,9 @@ Recommended publishing shape:
   }
 }
 ```
+
+Persist this object as `output/<market>/publish/<video-id>.json`. The human-facing
+`发布资料_中日对照.md` is a deterministic consolidation of every JSON record in that directory;
+adding or regenerating one video must not remove the other video sections. Narration and description
+must be independently written, and `tag_translations` must contain one non-empty Chinese meaning for
+every value in `tags`.
