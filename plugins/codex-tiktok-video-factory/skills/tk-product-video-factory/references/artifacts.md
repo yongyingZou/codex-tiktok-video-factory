@@ -22,9 +22,10 @@ Store each market under `output/<market>/`:
 - `videos/<id>.mp4`: rendered video.
 - `covers/<id>.jpg`: simple related cover.
 - `publish/<id>.json`: bilingual-review publishing data containing stable product name,
-  video-specific description, CTA, cover copy, narration, five to seven tags with per-tag Chinese
-  meanings, and hashtag strategy/verification status. Target-market fields remain publishable;
-  Chinese fields are review-only.
+  video-specific description, CTA, cover copy, narration, actual rendered caption units with
+  timing and Chinese meanings, five to seven tags with per-tag Chinese meanings, and hashtag
+  strategy/verification status. Target-market fields remain publishable; Chinese fields are
+  review-only.
 - `reports/qa-report.json`: technical and editorial checks.
 
 Every edit-plan timeline item must include `source`, `start`, `end`, `purpose`, `spoken_meaning`,
@@ -45,10 +46,16 @@ short information elements that add meaning. `renderer` is normally `remotion` f
 motion work or `ffmpeg` for a deliberately simple treatment; unsupported requested treatments must
 be reported rather than silently removed.
 
+Every narrated edit plan also contains `caption_track` with `mode: "burn_in"`, timed `cues`, and
+optional style fields. These cues are the renderer's source of truth. Their text and timing must
+match the publishing `captions` records; the latter additionally carry Chinese meanings and
+narration-unit references.
+
 Recommended publishing shape:
 
 ```json
 {
+  "publish_schema_version": 2,
   "product_name": "Search-oriented product name within 30 characters",
   "product_name_cn": "Chinese meaning of the product name",
   "direction": "Target-market video direction",
@@ -60,6 +67,15 @@ Recommended publishing shape:
   "description": "What the product is + this video's hook/content/value + natural product-link CTA ✨",
   "description_cn": "Complete Chinese meaning check of the description",
   "description_max_characters": 3000,
+  "captions": [
+    {
+      "start": 0.1,
+      "end": 1.8,
+      "text": "Target-market rendered caption",
+      "meaning_cn": "Chinese meaning check",
+      "narration_unit": "L1"
+    }
+  ],
   "tags": ["#core_product", "#category", "#feature", "#scene", "#problem"],
   "tag_translations": [
     {"tag": "#core_product", "meaning_cn": "核心商品词"},
@@ -78,4 +94,7 @@ Persist this object as `output/<market>/publish/<video-id>.json`. The human-faci
 `发布资料_中日对照.md` is a deterministic consolidation of every JSON record in that directory;
 adding or regenerating one video must not remove the other video sections. Narration and description
 must be independently written, and `tag_translations` must contain one non-empty Chinese meaning for
-every value in `tags`.
+every value in `tags`. Publishing schema v2 also requires every rendered caption unit to include
+start/end time, target-market text, Chinese meaning, and its narration-unit reference. The Markdown
+must include a directly copyable one-line target-market hashtag block, a same-order Chinese meaning
+line, and the per-tag bilingual table.

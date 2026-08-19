@@ -148,6 +148,11 @@ segments, join them with deliberate pauses, measure the actual audio, and only t
 cuts, action cues, and caption intervals. Store each segment's final start/end time. Any regenerated
 voice segment invalidates downstream caption and action timing until those cues are rebuilt.
 
+For every narrated plan, create `caption_track.mode = burn_in` with concise target-language cues
+timed to the final narration audio. Rendering is blocked if the track is missing or empty. The
+publishing caption records must carry identical cue text and start/end times so the delivered
+document describes what viewers actually see.
+
 ## 7. Edit plan and render
 
 Plan the timeline before rendering. Align spoken meaning with visible action. Avoid overlapping new
@@ -220,13 +225,17 @@ to an otherwise identical transcript. Automated validation blocks direct and nea
 
 The consolidated publishing document must provide target-market text and Chinese meaning side by
 side for every publish-facing item: product name, video direction, cover copy, narration,
-description, CTA, and each hashtag. Keep the target-market description within 3000 characters. The
+description, CTA, every rendered caption unit, and each hashtag. Caption rows include start/end
+time and their narration-unit references so the exact text burned into the video remains auditable.
+Keep the target-market description within 3000 characters. The
 Chinese text is an internal review aid and must not be mixed into the actual target-market fields.
 Store each video's publishing record separately under `publish/<video-id>.json`. Whenever a new
 video is rendered, rebuild the consolidated bilingual Markdown from all per-video records; never
 overwrite it with only the newest entry. Preserve an unstructured legacy Markdown document verbatim
 until it has been migrated. Every hashtag row must contain the target-market tag and a non-empty
-Chinese meaning.
+Chinese meaning. Also output all target-market hashtags on one directly copyable line, followed by
+one same-order Chinese meaning line and then the per-tag bilingual table. The table alone is not a
+sufficient publishing handoff.
 
 For Japan, write descriptions and hashtags natively in Japanese from the start. Use Japanese
 product-category vocabulary, natural social-commerce phrasing, and search terms Japanese shoppers

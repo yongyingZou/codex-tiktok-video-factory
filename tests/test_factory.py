@@ -23,6 +23,7 @@ SPEC.loader.exec_module(factory)
 def complete_publish(**overrides):
     tags = ["#商品", "#カテゴリ", "#特徴", "#場面", "#悩み"]
     value = {
+        "publish_schema_version": 2,
         "product_name": "テスト商品",
         "product_name_cn": "测试商品",
         "direction": "白い服の日の悩み",
@@ -35,6 +36,10 @@ def complete_publish(**overrides):
         "description_cn": "视频介绍适合白色衣服的商品要点，详情请查看商品页。",
         "cta": "詳細は商品ページへ。",
         "cta_cn": "详情请查看商品页。",
+        "captions": [{
+            "start": 0.1, "end": 1.8, "text": "白い服の日に",
+            "meaning_cn": "穿白色衣服时", "narration_unit": "L1",
+        }],
         "tags": tags,
         "tag_translations": [
             {"tag": tag, "meaning_cn": meaning}
@@ -47,6 +52,52 @@ def complete_publish(**overrides):
 
 
 class FactoryTests(unittest.TestCase):
+    def test_narrated_video_requires_matching_burned_caption_track(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP/clip.mp4"
+            source.parent.mkdir(parents=True)
+            source.touch()
+            plan = {
+                "id": "C01", "market": "JP", "locale": "ja-JP",
+                "output": "output/JP/videos/C01.mp4",
+                "timeline": [{
+                    "source": "SP/clip.mp4", "start": 0, "end": 2,
+                    "purpose": "hook", "provenance": {"status": "unknown"},
+                    "subtitle": {"mode": "preserve"},
+                }],
+                "voiceover": {"text": "白い服の日に"},
+                "publish": complete_publish(),
+            }
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("caption_track.mode=burn_in" in error for error in errors))
+
+            plan["caption_track"] = {
+                "mode": "burn_in",
+                "cues": [{"start": 0.1, "end": 1.8, "text": "別の字幕"}],
+            }
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("实际烧录" in error for error in errors))
+
+            plan["caption_track"]["cues"][0]["text"] = "白い服の日に"
+            self.assertEqual(factory.pipeline.validate_plan(plan, root), [])
+
+    def test_caption_track_builds_burn_in_drawtext_filter(self):
+        with tempfile.TemporaryDirectory() as temp:
+            filters = factory.pipeline._caption_track_filters({
+                "caption_track": {
+                    "mode": "burn_in",
+                    "cues": [{"start": 0.2, "end": 1.4, "text": "口播字幕"}],
+                }
+            }, 1920, Path(temp))
+            self.assertEqual(len(filters), 1)
+            self.assertIn("drawtext=", filters[0])
+            self.assertIn("between(t,0.200,1.400)", filters[0])
+            self.assertEqual(
+                (Path(temp) / "narration-caption-001.txt").read_text(encoding="utf-8"),
+                "口播字幕",
+            )
+
     def test_render_gate_requires_complete_analysis_and_baseline_approval(self):
         with tempfile.TemporaryDirectory() as temp:
             product = Path(temp)
@@ -268,6 +319,34 @@ class FactoryTests(unittest.TestCase):
             errors = factory.pipeline.validate_plan(plan, root)
             self.assertTrue(any("不能直接复制" in error for error in errors))
 
+    def test_publish_v2_requires_complete_bilingual_caption_records(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = root / "SP/clip.mp4"
+            source.parent.mkdir(parents=True)
+            source.touch()
+            plan = {
+                "id": "T05", "market": "JP", "locale": "ja-JP",
+                "output": "output/JP/videos/T05.mp4",
+                "timeline": [{
+                    "source": "SP/clip.mp4", "start": 0, "end": 2,
+                    "purpose": "hook", "provenance": {"status": "unknown"},
+                    "subtitle": {"mode": "preserve"},
+                }],
+                "publish": complete_publish(captions=[{
+                    "start": 0.1, "end": 1.0, "text": "字幕", "narration_unit": "L1"
+                }]),
+            }
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("缺少 meaning_cn" in error for error in errors))
+
+            plan["publish"] = complete_publish(captions=[{
+                "start": 1.0, "end": 0.5, "text": "字幕",
+                "meaning_cn": "字幕含义", "narration_unit": "L1",
+            }])
+            errors = factory.pipeline.validate_plan(plan, root)
+            self.assertTrue(any("时间无效" in error for error in errors))
+
     def test_consolidated_publish_preserves_entries_and_bilingual_tags(self):
         with tempfile.TemporaryDirectory() as temp:
             product = Path(temp)
@@ -286,6 +365,12 @@ class FactoryTests(unittest.TestCase):
             self.assertIn("## A01", text)
             self.assertIn("## B01", text)
             self.assertIn("| #商品 | 商品 |", text)
+            self.assertIn("### 画面字幕", text)
+            self.assertIn("| 0.10–1.80s | 白い服の日に | 穿白色衣服时 | L1 |", text)
+            self.assertIn("### 话题标签｜日文直接复制", text)
+            self.assertIn("#商品 #カテゴリ #特徴 #場面 #悩み", text)
+            self.assertIn("### 话题标签｜中文对应含义（按相同顺序）", text)
+            self.assertIn("商品｜类别｜特点｜场景｜烦恼", text)
             self.assertIn("旧版人工备注，不得丢失。", text)
             factory.pipeline.write_consolidated_publish_markdown(product, "JP")
             second = target.read_text(encoding="utf-8")

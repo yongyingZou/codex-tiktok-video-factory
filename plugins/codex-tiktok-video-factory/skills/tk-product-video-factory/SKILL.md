@@ -87,6 +87,10 @@ and FFmpeg as supporting and execution tools.
   rendered segment and pause, then lock the picture and caption timeline to those actual durations.
   Never time captions or action cuts from estimated reading speed. If performance changes alter
   duration, regenerate timing; do not preserve stale caption cues or silently stretch speech.
+- Every video with narration must carry one concise, synchronized target-language caption track
+  burned into the rendered video. A clean source clip is not a reason to omit this track. Rendering
+  must fail when narration exists but the caption track is absent, empty, invalid, or differs from
+  the caption records delivered in publishing data.
 - Keep promotion, price, quantity, size, material, and performance claims consistent with confirmed
   facts.
 - Flag missing footage or ambiguous evidence immediately. Never fabricate product behavior.
@@ -130,14 +134,17 @@ seven relevant tags split between stable product/category terms and terms specif
 problem, scene, or feature. Never label guessed tags as trending. Record whether real-time trend
 verification was performed and keep unverified tags as relevance candidates. Provide a Chinese
 meaning check for every publishing field: product name, video direction, cover copy, narration,
-description, CTA, and each hashtag. The target-market fields remain publication-ready and must not
+every rendered caption unit, description, CTA, and each hashtag. Caption records include start/end
+time and the narration-unit reference. The target-market fields remain publication-ready and must not
 contain the Chinese checks. Create Japanese descriptions and hashtags directly from natural
 Japanese commerce-video language and Japanese search/category usage; never translate Chinese copy
 literally or use Chinese ecommerce phrasing with Japanese words substituted. Chinese is a
 post-writing meaning check only. Keep each target-market description within 3000 characters.
 Keep one durable `publish/<video-id>.json` record per video and regenerate the consolidated Markdown
 from all records so adding a video cannot erase earlier publishing data. Do not use narration as the
-description with only a CTA appended. Require a non-empty Chinese meaning for every hashtag.
+description with only a CTA appended. Require a non-empty Chinese meaning for every hashtag. In the
+human Markdown, output the target-market hashtags once on a directly copyable single line, then a
+same-order Chinese meaning line, and then the per-tag bilingual audit table.
 
 ## Quality gate
 

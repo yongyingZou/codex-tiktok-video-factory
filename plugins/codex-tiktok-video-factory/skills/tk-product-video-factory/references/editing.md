@@ -42,6 +42,10 @@ or CTA. It should complement the narration rather than duplicate every spoken wo
 and picture-in-picture must point to visible product information. Follow `subtitles.md` when source
 text is present; do not create a second competing caption track.
 
+Narration captions are a separate required comprehension layer. Every narrated video must define
+one concise target-language `caption_track` timed from the final audio and burn it into the finished
+video. Motion text may remain selective, but it never substitutes for this track.
+
 ## Sound design
 
 Build a complete sound timeline:

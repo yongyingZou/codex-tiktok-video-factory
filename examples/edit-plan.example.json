@@ -155,6 +155,18 @@
     "volume": 1.0,
     "text": "Target-market narration written directly in the target language."
   },
+  "caption_track": {
+    "mode": "burn_in",
+    "cues": [
+      {"start": 2.2, "end": 4.2, "text": "短い口播字幕"}
+    ],
+    "style": {
+      "font_color": "white",
+      "border_color": "black",
+      "border_width": 3,
+      "y": "h*0.76"
+    }
+  },
   "music": {
     "file": "",
     "volume": 0.12,
@@ -167,6 +179,7 @@
     "output": "output/JP/covers/A01.jpg"
   },
   "publish": {
+    "publish_schema_version": 2,
     "product_name": "Stable product name within 30 chars",
     "product_name_cn": "稳定、可搜索的中文商品名称",
     "direction": "Target-market direction for this video",
@@ -179,6 +192,15 @@
     "description_cn": "Concise Chinese meaning check for the user",
     "cta": "Natural target-market product-link CTA",
     "cta_cn": "行动引导的中文核对",
+    "captions": [
+      {
+        "start": 2.2,
+        "end": 4.2,
+        "text": "短い口播字幕",
+        "meaning_cn": "简短口播字幕",
+        "narration_unit": "L1"
+      }
+    ],
     "tags": ["#core_product", "#category", "#feature", "#scene", "#problem"],
     "tag_translations": [
       {"tag": "#core_product", "meaning_cn": "核心商品词"},

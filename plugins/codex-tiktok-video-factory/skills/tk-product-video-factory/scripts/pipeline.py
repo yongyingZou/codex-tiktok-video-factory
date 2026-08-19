@@ -61,6 +61,29 @@ def _description_reuses_narration(publish: dict) -> bool:
     return SequenceMatcher(None, narration, description).ratio() >= 0.82
 
 
+def _caption_signature(cues: object) -> list[tuple[float, float, str]]:
+    if not isinstance(cues, list):
+        return []
+    signature = []
+    for cue in cues:
+        if not isinstance(cue, dict):
+            continue
+        try:
+            signature.append((
+                round(float(cue.get("start", 0)), 3),
+                round(float(cue.get("end", 0)), 3),
+                str(cue.get("text", "")).strip(),
+            ))
+        except (TypeError, ValueError):
+            continue
+    return signature
+
+
+def _markdown_cell(value: object) -> str:
+    """Keep generated review tables valid without mutating structured records."""
+    return str(value).replace("|", r"\|").replace("\n", "<br>")
+
+
 def write_consolidated_publish_markdown(product: Path, market: str) -> Path:
     """Rebuild the human deliverable from all per-video records without dropping history."""
     publish_dir = product / "output" / market / "publish"
@@ -103,16 +126,53 @@ def write_consolidated_publish_markdown(product: Path, market: str) -> Path:
             f"- 日文：{item.get('cta', '')}",
             f"- 中文：{item.get('cta_cn', '')}",
             "",
-            "### 话题标签",
-            "| 日文标签 | 中文含义 |",
-            "| --- | --- |",
         ])
         translations = {
             row.get("tag"): row.get("meaning_cn", "")
             for row in item.get("tag_translations", [])
             if isinstance(row, dict)
         }
-        for tag in item.get("tags", []):
+        tags = item.get("tags", [])
+        meanings = [translations.get(tag, "") for tag in tags]
+        sections.extend([
+            "### 画面字幕",
+            "",
+        ])
+        captions = item.get("captions", [])
+        if captions:
+            sections.extend([
+                "| 时间 | 日文字幕 | 中文含义 | 对应口播单元 |",
+                "| --- | --- | --- | --- |",
+            ])
+            for cue in captions:
+                start = float(cue.get("start", 0))
+                end = float(cue.get("end", 0))
+                sections.append(
+                    f"| {start:.2f}–{end:.2f}s | {_markdown_cell(cue.get('text', ''))} | "
+                    f"{_markdown_cell(cue.get('meaning_cn', ''))} | "
+                    f"{_markdown_cell(cue.get('narration_unit', ''))} |"
+                )
+        else:
+            sections.append("- 当前记录未提供结构化画面字幕。")
+        sections.extend([
+            "",
+            "### 话题标签｜日文直接复制",
+            "",
+            "```text",
+            " ".join(tags),
+            "```",
+            "",
+            "### 话题标签｜中文对应含义（按相同顺序）",
+            "",
+            "```text",
+            "｜".join(meanings),
+            "```",
+            "",
+            "### 话题标签｜逐项中日对照",
+            "| 日文标签 | 中文含义 |",
+            "| --- | --- |",
+        ])
+        for tag in tags:
             sections.append(f"| {tag} | {translations.get(tag, '')} |")
     if legacy:
         sections.extend([
@@ -300,6 +360,35 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
                     errors.append(f"片段 {index} 字幕 {cue_index} 没有文字")
                 if float(cue.get("end", 0)) <= float(cue.get("start", 0)):
                     errors.append(f"片段 {index} 字幕 {cue_index} 时间无效")
+    voiceover = plan.get("voiceover", {})
+    caption_track = plan.get("caption_track", {})
+    caption_cues = caption_track.get("cues") if isinstance(caption_track, dict) else None
+    has_voiceover = bool(str(voiceover.get("text", "")).strip() or voiceover.get("file"))
+    if has_voiceover:
+        if not isinstance(caption_track, dict) or caption_track.get("mode") != "burn_in":
+            errors.append("有口播的视频必须声明 caption_track.mode=burn_in，不能生成无自有字幕成片")
+        if not isinstance(caption_cues, list) or not caption_cues:
+            errors.append("有口播的视频必须包含非空 caption_track.cues")
+    if isinstance(caption_cues, list):
+        timeline_duration = sum(
+            max(0.0, float(clip.get("end", 0)) - float(clip.get("start", 0)))
+            for clip in plan.get("timeline", [])
+        )
+        previous_end = -1.0
+        for cue_index, cue in enumerate(caption_cues, 1):
+            if not isinstance(cue, dict) or not str(cue.get("text", "")).strip():
+                errors.append(f"口播字幕 {cue_index} 缺少文字")
+                continue
+            try:
+                start = float(cue.get("start", 0))
+                end = float(cue.get("end", 0))
+                if start < 0 or end <= start or end > timeline_duration + 0.08:
+                    errors.append(f"口播字幕 {cue_index} 时间无效或超出成片")
+                if start < previous_end:
+                    errors.append(f"口播字幕 {cue_index} 与前一条重叠")
+                previous_end = max(previous_end, end)
+            except (TypeError, ValueError):
+                errors.append(f"口播字幕 {cue_index} 时间格式错误")
     publish = plan.get("publish", {})
     if len(publish.get("product_name", "")) > 30:
         errors.append("商品名称超过30个字符")
@@ -335,6 +424,26 @@ def validate_plan(plan: dict, product: Path) -> list[str]:
     strategy = publish.get("hashtag_strategy", {})
     if not isinstance(strategy.get("realtime_hot_verified"), bool):
         errors.append("发布资料必须声明话题标签是否经过实时热门验证")
+    publish_schema_version = int(publish.get("publish_schema_version", 1))
+    if publish_schema_version >= 2:
+        captions = publish.get("captions")
+        if not isinstance(captions, list) or not captions:
+            errors.append("发布资料v2必须包含非空画面字幕 captions")
+        else:
+            for cue_index, cue in enumerate(captions, 1):
+                if not isinstance(cue, dict):
+                    errors.append(f"发布资料画面字幕 {cue_index} 必须是对象")
+                    continue
+                for field in ("text", "meaning_cn", "narration_unit"):
+                    if not str(cue.get(field, "")).strip():
+                        errors.append(f"发布资料画面字幕 {cue_index} 缺少 {field}")
+                try:
+                    if float(cue.get("end", 0)) <= float(cue.get("start", 0)):
+                        errors.append(f"发布资料画面字幕 {cue_index} 时间无效")
+                except (TypeError, ValueError):
+                    errors.append(f"发布资料画面字幕 {cue_index} 时间格式错误")
+        if has_voiceover and _caption_signature(captions) != _caption_signature(caption_cues):
+            errors.append("发布资料 captions 必须与实际烧录的 caption_track.cues 文本和时间完全一致")
     return errors
 
 
@@ -493,6 +602,33 @@ def _subtitle_filters(
             f"x={x}+({box_width}-text_w)/2:"
             f"y={y}+({box_height}-text_h)/2:"
             f"enable='{enable}'"
+        )
+    return filters
+
+
+def _caption_track_filters(plan: dict, height: int, temp: Path) -> list[str]:
+    """Build the required full-video narration-caption track."""
+    track = plan.get("caption_track", {})
+    if track.get("mode") != "burn_in":
+        return []
+    style = track.get("style", {})
+    font = _font_file(style.get("font_file"))
+    font_part = f":fontfile='{_filter_path(Path(font))}'" if font else ""
+    font_size = int(style.get("font_size", max(34, round(height * 0.031))))
+    y = style.get("y", "h*0.76")
+    filters = []
+    for cue_index, cue in enumerate(track.get("cues", []), 1):
+        text_file = temp / f"narration-caption-{cue_index:03d}.txt"
+        text_file.write_text(cue["text"], encoding="utf-8")
+        enable = f"between(t,{float(cue['start']):.3f},{float(cue['end']):.3f})"
+        filters.append(
+            f"drawtext=textfile='{_filter_path(text_file)}'{font_part}:expansion=none:"
+            f"fontsize={font_size}:fontcolor={style.get('font_color', 'white')}:"
+            f"borderw={int(style.get('border_width', 3))}:"
+            f"bordercolor={style.get('border_color', 'black')}:"
+            f"box={1 if style.get('box', False) else 0}:"
+            f"boxcolor={style.get('box_color', 'black@0.45')}:"
+            f"x=(w-text_w)/2:y={y}:enable='{enable}'"
         )
     return filters
 
@@ -755,6 +891,13 @@ def render(product: Path, plan_path: Path) -> dict:
             "ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(base),
         ]
         filter_parts = []
+        caption_filters = _caption_track_filters(plan, height, temp)
+        video_map = "0:v:0"
+        video_codec = ["-c:v", "copy"]
+        if caption_filters:
+            filter_parts.append(f"[0:v]{','.join(caption_filters)}[vout]")
+            video_map = "[vout]"
+            video_codec = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
         mix_inputs = ["[0:a]"]
         next_index = 1
         if narration_file:
@@ -779,8 +922,8 @@ def render(product: Path, plan_path: Path) -> dict:
         )
         command += [
             "-filter_complex", ";".join(filter_parts),
-            "-map", "0:v:0", "-map", "[aout]",
-            "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
+            "-map", video_map, "-map", "[aout]",
+            *video_codec, "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart", "-shortest", str(output),
         ]
         run(command)
@@ -929,6 +1072,26 @@ def qa(product: Path, plan_path: Path) -> dict:
             ]
             check("editorial_decisions_complete", not missing_editorial, missing_editorial)
         publish = plan.get("publish", {})
+        voiceover = plan.get("voiceover", {})
+        caption_track = plan.get("caption_track", {})
+        has_voiceover = bool(str(voiceover.get("text", "")).strip() or voiceover.get("file"))
+        check(
+            "narration_caption_track_declared",
+            not has_voiceover or (
+                caption_track.get("mode") == "burn_in"
+                and bool(caption_track.get("cues"))
+            ),
+            caption_track,
+        )
+        check(
+            "rendered_and_publish_captions_match",
+            not has_voiceover or _caption_signature(caption_track.get("cues"))
+            == _caption_signature(publish.get("captions")),
+            {
+                "rendered": caption_track.get("cues", []),
+                "published": publish.get("captions", []),
+            },
+        )
         check("product_name_length", len(publish.get("product_name", "")) <= 30, publish.get("product_name"))
         symbol_chars = [
             char for char in publish.get("product_name", "")
@@ -1002,6 +1165,7 @@ def qa(product: Path, plan_path: Path) -> dict:
                 "字幕替换区域是否过大、残留字形或形成明显补丁",
                 "裁切是否损伤商品主体、手部动作或使用效果",
                 "替换字幕是否与口播同步且没有闪出原硬字幕",
+                "自有口播字幕是否在全片实际可见、与最终口播同步且没有被平台控件遮挡",
                 "画面、声音、文字与叙事是否形成实质性的新表达",
                 "每个切点是否由动作或语义驱动，而不是机械按时长切割",
                 "局部变速、文字、转场和音效是否确有叙事作用",
