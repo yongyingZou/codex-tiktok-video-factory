@@ -71,6 +71,7 @@ py bootstrap.py
 ```bash
 # macOS / Linux
 python3 factory.py doctor
+python3 factory.py version
 
 # Windows PowerShell
 py factory.py doctor

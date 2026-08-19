@@ -88,6 +88,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def runtime_identity() -> dict:
+    plugin_root = Path(__file__).resolve().parents[3]
+    manifest = plugin_root / ".codex-plugin/plugin.json"
+    skill = plugin_root / "skills/tk-product-video-factory/SKILL.md"
+    data = json.loads(manifest.read_text(encoding="utf-8")) if manifest.is_file() else {}
+    return {
+        "plugin_name": data.get("name", "unknown"),
+        "plugin_version": data.get("version", "unknown"),
+        "plugin_root": str(plugin_root),
+        "factory_sha256": sha256(Path(__file__).resolve()),
+        "pipeline_sha256": sha256(Path(pipeline.__file__).resolve()),
+        "skill_sha256": sha256(skill) if skill.is_file() else None,
+    }
+
+
 def ffprobe(path: Path) -> dict:
     binary = find_command("ffprobe")
     if not binary:
@@ -200,11 +215,16 @@ def command_doctor(_: argparse.Namespace) -> int:
     optional = ["scenedetect", "paddleocr"]
     for name in optional:
         checks[name] = {"ok": bool(find_command(name)), "detail": find_command(name), "optional": True}
-    print(json.dumps(checks, ensure_ascii=False, indent=2))
+    print(json.dumps({"runtime": runtime_identity(), "checks": checks}, ensure_ascii=False, indent=2))
     required_ok = all(v["ok"] for k, v in checks.items() if k in {"python", "ffmpeg", "ffprobe"})
     if not checks["edge-tts"]["ok"]:
         print("\n提示：尚未安装默认多语言口播。运行：python3 -m pip install edge-tts")
     return 0 if required_ok else 1
+
+
+def command_version(_: argparse.Namespace) -> int:
+    print(json.dumps(runtime_identity(), ensure_ascii=False, indent=2))
+    return 0
 
 
 def command_markets(_: argparse.Namespace) -> int:
@@ -406,6 +426,8 @@ def parser() -> argparse.ArgumentParser:
     commands = result.add_subparsers(dest="command", required=True)
     doctor = commands.add_parser("doctor", help="检查本机能力")
     doctor.set_defaults(func=command_doctor)
+    version = commands.add_parser("version", help="显示实际加载的插件版本和代码指纹")
+    version.set_defaults(func=command_version)
     markets = commands.add_parser("markets", help="查看支持的市场")
     markets.set_defaults(func=command_markets)
     voice_test = commands.add_parser("voice-test", help="试听目标市场的推荐音色")

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import math
 import os
 import shutil
@@ -37,6 +38,17 @@ def save(path: Path, value: object) -> None:
 
 def _normalized_copy(text: str) -> str:
     return "".join(char for char in text.lower() if char.isalnum())
+
+
+def production_identity() -> dict:
+    plugin_root = Path(__file__).resolve().parents[3]
+    manifest = plugin_root / ".codex-plugin/plugin.json"
+    data = load(manifest) if manifest.is_file() else {}
+    return {
+        "plugin_name": data.get("name", "unknown"),
+        "plugin_version": data.get("version", "unknown"),
+        "pipeline_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
 
 
 def _description_reuses_narration(publish: dict) -> bool:
@@ -787,6 +799,7 @@ def render(product: Path, plan_path: Path) -> dict:
     consolidated_publish = write_consolidated_publish_markdown(product, plan["market"])
     result = {
         "status": "rendered",
+        "production_identity": production_identity(),
         "video": str(output),
         "cover": str(cover),
         "publish": str(publish),
@@ -975,6 +988,7 @@ def qa(product: Path, plan_path: Path) -> dict:
         check("replacement_captions_fit_region", not long_cues, long_cues)
         report = {
             "status": "pass" if all(c["status"] == "pass" for c in checks) else "fail",
+            "production_identity": production_identity(),
             "checks": checks,
             "remix_depth": remix_depth(plan),
             "manual_review_required": [

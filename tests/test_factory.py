@@ -137,6 +137,14 @@ class FactoryTests(unittest.TestCase):
         self.assertEqual(factory.market_profile("SG", "zh-CN")["language"], "中文")
         self.assertEqual(factory.voice_for("BE", "female", "fr-BE"), "fr-BE-CharlineNeural")
 
+    def test_runtime_identity_reports_manifest_and_code_hashes(self):
+        identity = factory.runtime_identity()
+        self.assertEqual(identity["plugin_name"], "codex-tiktok-video-factory")
+        self.assertNotEqual(identity["plugin_version"], "unknown")
+        self.assertEqual(len(identity["factory_sha256"]), 64)
+        self.assertEqual(len(identity["pipeline_sha256"]), 64)
+        self.assertEqual(len(identity["skill_sha256"]), 64)
+
     def test_empty_product_reports_missing_inputs(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "123_demo"
