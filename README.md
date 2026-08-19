@@ -1,5 +1,25 @@
 # TikTok Shop AI Video Remix Factory
 
+> 当前稳定交付版本：**商品视频工厂 V2.0.0**
+>
+> [安装指南](INSTALL.md) · [使用指南](USER_GUIDE.md) · [V2.0.0 发布说明](RELEASE_NOTES_V2.0.0.md)
+
+## 安装到 Codex
+
+```bash
+codex plugin marketplace add yongyingZou/codex-tiktok-video-factory --ref V2.0.0
+codex plugin add codex-tiktok-video-factory@tiktok-video-factory
+```
+
+重新启动 ChatGPT/Codex 桌面应用并新建任务，然后复制：
+
+```text
+使用商品视频工厂 V2.0.0。
+读取这个商品目录的全部素材，先做一个方向的单视频校准，暂不批量。
+```
+
+完整的系统要求、Windows 命令、自检和更新方法见 [INSTALL.md](INSTALL.md)。
+
 ## 不会剪辑，也能建立自己的TikTok Shop视频生产线
 
 **把商品图片和素材视频放进文件夹，AI从理解商品、看完素材、策划卖点，到多语言口播、
